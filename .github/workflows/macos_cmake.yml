@@ -1,0 +1,526 @@
+name: macOS_cmake
+
+on: [push, pull_request]
+
+env:
+  BUILD_DIR: ${{ github.workspace }}/build
+  INSTALL_DIR: ${{ github.workspace }}/install
+
+  CCACHE_DIR: ${{ github.workspace }}/ccache
+  CCACHE_MAXSIZE: 10G
+
+jobs:
+
+  build_python:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ./dependencies.sh
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.job }}-python
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.job }}-python
+            ccache-${{ runner.os }}-${{ github.job }}-
+
+      - run: ls -al /Applications/Xcode_15.0.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/
+
+
+      - name: Initial configure
+        run: cmake -S ${{ github.workspace }} -B ${{ env.BUILD_DIR }} -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_DIR }} -DCMAKE_BUILD_PARALLEL_LEVEL=3
+
+
+      - name: Build
+        run: > 
+          cmake --build ${BUILD_DIR} -- python
+
+      - name: Remove .pyc files and tests from install directory
+        run: |
+          find ${INSTALL_DIR} -type f -name *.pyc -delete
+          rm -rf ${INSTALL_DIR}/python/3.12.2/lib/python3.12/test
+
+      - name: Package build
+        run: |
+          tar czf build.tar.gz -C ${BUILD_DIR} .
+          tar czf install.tar.gz -C ${INSTALL_DIR} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build_1
+          path: |
+            build.tar.gz
+            install.tar.gz
+
+  # can run in parallel, not needed by anything else
+  build_boost_eigen:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ./dependencies.sh
+
+      - name: Initial configure
+        run: cmake -S ${{ github.workspace }} -B ${{ env.BUILD_DIR }} -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_DIR }} -DCMAKE_BUILD_PARALLEL_LEVEL=3
+
+      - name: Build
+        run: > 
+          cmake --build ${BUILD_DIR} -- boost eigen
+
+      - name: Package build
+        run: |
+          tar czf install.tar.gz -C ${INSTALL_DIR} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build_boost_eigen
+          path: |
+            install.tar.gz
+
+  build_tbb:
+    runs-on: macos-14
+    needs: [build_python]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ./dependencies.sh
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.job }}-tbb
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.job }}-tbb
+            ccache-${{ runner.os }}-${{ github.job }}-
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build_1
+          path: .
+
+      - run: |
+          mkdir ${BUILD_DIR}
+          tar xf build.tar.gz -C ${BUILD_DIR}
+          mkdir ${INSTALL_DIR}
+          tar xf install.tar.gz -C ${INSTALL_DIR}
+
+      - name: Build
+        run: > 
+          cmake --build ${BUILD_DIR} -- tbb
+
+      - name: Package build
+        run: |
+          tar czf build.tar.gz -C ${BUILD_DIR} .
+          tar czf install.tar.gz -C ${INSTALL_DIR} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build_2
+          path: |
+            build.tar.gz
+            install.tar.gz
+  
+  build_nlohmann_json:
+    runs-on: macos-14
+    needs: [build_tbb]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ./dependencies.sh
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.job }}-nlohmann_json
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.job }}-nlohmann_json
+            ccache-${{ runner.os }}-${{ github.job }}-
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build_2
+          path: .
+
+      - run: |
+          mkdir ${BUILD_DIR}
+          tar xf build.tar.gz -C ${BUILD_DIR}
+          mkdir ${INSTALL_DIR}
+          tar xf install.tar.gz -C ${INSTALL_DIR}
+
+      - name: Build
+        run: > 
+          cmake --build ${BUILD_DIR} -- nlohmann_json
+
+      - name: Package build
+        run: |
+          tar czf build.tar.gz -C ${BUILD_DIR} .
+          tar czf install.tar.gz -C ${INSTALL_DIR} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build_3
+          path: |
+            build.tar.gz
+            install.tar.gz
+
+  build_root:
+    runs-on: macos-14
+
+    needs: [build_nlohmann_json]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ./dependencies.sh
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.job }}-root
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.job }}-root
+            ccache-${{ runner.os }}-${{ github.job }}-
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build_3
+          path: .
+
+      - run: |
+          mkdir ${BUILD_DIR}
+          tar xf build.tar.gz -C ${BUILD_DIR}
+          mkdir ${INSTALL_DIR}
+          tar xf install.tar.gz -C ${INSTALL_DIR}
+
+      - name: Build
+        run: > 
+          cmake --build ${BUILD_DIR} -- root
+
+      - name: Package build
+        run: |
+          tar czf build.tar.gz -C ${BUILD_DIR} .
+          tar czf install.tar.gz -C ${INSTALL_DIR} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build_4
+          path: |
+            build.tar.gz
+            install.tar.gz
+
+  build_podio_edm4hep:
+    runs-on: macos-14
+
+    needs: [build_root]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ./dependencies.sh
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.job }}-podio
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.job }}-podio
+            ccache-${{ runner.os }}-${{ github.job }}-
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build_4
+          path: .
+
+      - run: |
+          mkdir ${BUILD_DIR}
+          tar xf build.tar.gz -C ${BUILD_DIR}
+          mkdir ${INSTALL_DIR}
+          tar xf install.tar.gz -C ${INSTALL_DIR}
+
+      - name: Build
+        run: > 
+          cmake --build ${BUILD_DIR} -- podio edm4hep
+
+      - name: Package build
+        run: |
+          tar czf build.tar.gz -C ${BUILD_DIR} .
+          tar czf install.tar.gz -C ${INSTALL_DIR} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build_5
+          path: |
+            build.tar.gz
+            install.tar.gz
+
+  build_geant4:
+    runs-on: macos-14
+
+    needs: [build_podio_edm4hep]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ./dependencies.sh
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.job }}-geant4
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.job }}-geant4
+            ccache-${{ runner.os }}-${{ github.job }}-
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build_5
+          path: .
+
+      - run: |
+          mkdir ${BUILD_DIR}
+          tar xf build.tar.gz -C ${BUILD_DIR}
+          mkdir ${INSTALL_DIR}
+          tar xf install.tar.gz -C ${INSTALL_DIR}
+
+      - name: Build
+        run: > 
+          cmake --build ${BUILD_DIR} -- geant4
+
+      - name: Package build
+        run: |
+          tar czf build.tar.gz -C ${BUILD_DIR} .
+          tar czf install.tar.gz -C ${INSTALL_DIR} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build_6
+          path: |
+            build.tar.gz
+            install.tar.gz
+
+  build_dd4hep:
+    runs-on: macos-14
+
+    needs: [build_geant4]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ./dependencies.sh
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.job }}-dd4hep
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.job }}-dd4hep
+            ccache-${{ runner.os }}-${{ github.job }}-
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build_6
+          path: .
+
+      - run: |
+          mkdir ${BUILD_DIR}
+          tar xf build.tar.gz -C ${BUILD_DIR}
+          mkdir ${INSTALL_DIR}
+          tar xf install.tar.gz -C ${INSTALL_DIR}
+
+      - name: Build
+        run: > 
+          cmake --build ${BUILD_DIR} -- dd4hep
+
+      - name: Package build
+        run: |
+          tar czf build.tar.gz -C ${BUILD_DIR} .
+          tar czf install.tar.gz -C ${INSTALL_DIR} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build_7
+          path: |
+            build.tar.gz
+            install.tar.gz
+
+  build_hepmc3:
+    runs-on: macos-14
+
+    needs: [build_dd4hep]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ./dependencies.sh
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.job }}-hepmc3
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.job }}-hepmc3
+            ccache-${{ runner.os }}-${{ github.job }}-
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build_7
+          path: .
+
+      - run: |
+          mkdir ${BUILD_DIR}
+          tar xf build.tar.gz -C ${BUILD_DIR}
+          mkdir ${INSTALL_DIR}
+          tar xf install.tar.gz -C ${INSTALL_DIR}
+
+      - name: Build
+        run: > 
+          cmake --build ${BUILD_DIR} -- hepmc3
+
+      - name: Package build
+        run: |
+          tar czf build.tar.gz -C ${BUILD_DIR} .
+          tar czf install.tar.gz -C ${INSTALL_DIR} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build_8
+          path: |
+            build.tar.gz
+            install.tar.gz
+
+  build_pythia8:
+    runs-on: macos-14
+
+    needs: [build_hepmc3]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ./dependencies.sh
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.job }}-pythia8
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.job }}-pythia8
+            ccache-${{ runner.os }}-${{ github.job }}-
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build_8
+          path: .
+
+      - run: |
+          mkdir ${BUILD_DIR}
+          tar xf build.tar.gz -C ${BUILD_DIR}
+          mkdir ${INSTALL_DIR}
+          tar xf install.tar.gz -C ${INSTALL_DIR}
+
+      - name: Build
+        run: > 
+          cmake --build ${BUILD_DIR} -- hepmc3
+
+      - name: Package build
+        run: |
+          tar czf build.tar.gz -C ${BUILD_DIR} .
+          tar czf install.tar.gz -C ${INSTALL_DIR} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build_9
+          path: |
+            build.tar.gz
+            install.tar.gz
+
+  make_tarball:
+    runs-on: ubuntu-latest # we don't need macOS here
+    needs: 
+      - build_pythia8
+      - build_boost_eigen
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: build_9
+          path: .
+
+      - name: Unpack full bundle
+        run: |
+          mkdir -p ${INSTALL_DIR}
+          tar xf install.tar.gz -C ${INSTALL_DIR}
+          rm install.tar.gz
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build_boost_eigen
+          path: .
+
+      - name: Unpack boost/eigen bundle
+        run: |
+          mkdir -p install_boost_eigen
+          tar xf install.tar.gz -C install_boost_eigen
+          rm install.tar.gz
+
+      - name: Merge directories
+        run: cp -r install_boost_eigen/* ${INSTALL_DIR}
+
+      - name: Package merged directory
+        run: |
+          tar cf - -C ${INSTALL_DIR} . | zstd -o install.tar.zst -19 -T$(nproc)
+
+      - name: Upload merged install directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: deps
+          path: |
+            install.tar.zst
+
+  # deploy_to_eos:
+    # if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # runs-on: ubuntu-latest # we don't need macOS here
+    # needs:
+      # - make_tarball
+    # env: 
+      # DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      # DEPLOY_PWD: ${{ secrets.DEPLOY_PWD }}
+    # steps:
+      # - uses: actions/checkout@v4
+
+      # - name: Install prerequisites
+        # run: >
+          # sudo apt-get install -y krb5-user krb5-config
+
+      # - uses: actions/download-artifact@v4
+        # with:
+          # name: deps
+          # path: .
+
+      # - name: Upload
+        # run: >
+          # echo "$DEPLOY_PWD" | kinit $DEPLOY_USER@CERN.CH 2>&1 >/dev/null
+          # && sha=$(echo $GITHUB_SHA | head -c 7)
+          # && name=deps.$sha.tar.gz
+          # && mv deps.tar.gz $name
+          # && scp -F ssh_config $name $DEPLOY_USER@lxplus.cern.ch:/eos/user/a/atsjenkins/www/ACTS/ci/macOS/cmake
+          # && ssh -F ssh_config $DEPLOY_USER@lxplus.cern.ch ln -f -s $name /eos/user/a/atsjenkins/www/ACTS/ci/macOS/cmake/deps.latest.tar.gz

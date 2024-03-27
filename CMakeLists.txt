@@ -1,0 +1,324 @@
+cmake_minimum_required(VERSION 3.20)
+project(ActsDependencies)
+
+include(ExternalProject)
+include(GNUInstallDirs)
+
+set(PYTHON_VERSION 3.12.2)
+set(TBB_VERSION 2021.11.0)
+set(GEANT4_VERSION 11.1.3)
+set(HEPMC3_VERSION 3.2.5)
+set(PYTHIA8_VERSION 311)
+set(JSON_VERSION 3.11.2)
+set(ROOT_VERSION 6.30.02)
+set(ROOT_HASH SHA1=8fc49479265ccf493cfe9bb36ab1c1f23967b99a)
+set(PODIO_VERSION 00-17-02)
+set(EDM4HEP_VERSION 00-10-01)
+set(DD4HEP_VERSION 01-27)
+set(BOOST_VERSION 1.84.0)
+set(EIGEN_VERSION 3.4.0)
+
+if(POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)
+endif()
+
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
+
+if(NOT CMAKE_BUILD_PARALLEL_LEVEL)
+  set(CMAKE_BUILD_PARALLEL_LEVEL 1)
+endif()
+
+# Packages required to build a working python version
+find_package(OpenSSL REQUIRED)
+find_package(Curses REQUIRED)
+
+set(openssl_option "")
+if(APPLE)
+  execute_process(COMMAND brew --prefix openssl
+                  OUTPUT_VARIABLE OPENSSL_DIR)
+  set(openssl_option "--with-openssl=${OPENSSL_DIR}")
+endif()
+
+set(python_sdkroot "")
+if(APPLE)
+  set(python_sdkroot "SDKROOT=${CMAKE_OSX_SYSROOT}")
+endif()
+
+# Determine current platform as minimum from SYSROOT
+if(APPLE)
+  execute_process(COMMAND jq -r .MinimalDisplayName ${CMAKE_OSX_SYSROOT}/SDKSettings.json
+                  COMMAND_ERROR_IS_FATAL ANY
+                  OUTPUT_VARIABLE CMAKE_OSX_DEPLOYMENT_TARGET
+                  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "Minimal macOS Deployment Target determined to: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
+endif()
+
+
+ExternalProject_Add(python
+  PREFIX python
+  URL https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz
+  URL_HASH SHA1=459959e7dbeb89931db03457ea1f012353e34bce
+  BUILD_IN_SOURCE ON
+  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env "CFLAGS=-fPIC" ${python_sdkroot} ./configure --prefix=${CMAKE_INSTALL_PREFIX}/python/${PYTHON_VERSION} --enable-optimizations --with-lto ${openssl_option}
+  BUILD_COMMAND make -j${CMAKE_BUILD_PARALLEL_LEVEL}
+)
+
+string(REGEX MATCH "^([0-9]+\\.[0-9]+)\\.[0-9]+$" _temp ${PYTHON_VERSION})
+set(PYTHON_VERSION_MAJOR_MINOR ${CMAKE_MATCH_1})
+
+# We're guessing / expecting this file to be there when it's needed
+set(Python_EXECUTABLE "${CMAKE_INSTALL_PREFIX}/python/${PYTHON_VERSION}/bin/python${PYTHON_VERSION_MAJOR_MINOR}")
+set(_python_stamp_file "${CMAKE_CURRENT_BINARY_DIR}/python_exe_exists.stamp")
+
+message(STATUS "Python executable: ${Python_EXECUTABLE}")
+
+add_custom_command(OUTPUT ${_python_stamp_file}
+  COMMAND ${CMAKE_COMMAND} -E env sh -c "( test -e ${Python_EXECUTABLE} && touch ${_python_stamp_file} ) || ( echo 'Python executable not found at ${Python_EXECUTABLE}!' && exit 1 )"
+  VERBATIM
+  COMMENT "Checking for Python executable"
+  DEPENDS python)
+add_custom_target(PythonExeExists DEPENDS ${_python_stamp_file})
+            
+ExternalProject_Add(boost
+  PREFIX boost
+  URL https://github.com/boostorg/boost/releases/download/boost-${BOOST_VERSION}/boost-${BOOST_VERSION}.tar.gz
+  URL_HASH SHA1=75366b414f6d0f34533af9ea43acd58bb886e953
+  CMAKE_ARGS
+  -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+  -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}/boost/${BOOST_VERSION}
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}
+)
+
+ExternalProject_Add(eigen
+  PREFIX eigen
+  URL https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.gz
+  URL_HASH SHA1=d222db69a9e87d9006608e029d1039039f360b52
+  CMAKE_ARGS
+  -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+  -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}/eigen/${EIGEN_VERSION}
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}
+)
+  
+ExternalProject_Add(tbb
+  PREFIX tbb
+  URL https://github.com/oneapi-src/oneTBB/archive/refs/tags/v${TBB_VERSION}.tar.gz
+  URL_HASH SHA1=740e86b703f42446ddde392b73a9db3dc0f5f4cd
+  CMAKE_ARGS 
+  -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+  -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}/tbb/${TBB_VERSION}
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}
+  -DTBB_TEST=OFF
+  BUILD_COMMAND ${CMAKE_COMMAND} -E env CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL} ${CMAKE_COMMAND} --build <BINARY_DIR>
+)
+
+ExternalProject_Add(geant4 
+  PREFIX geant4
+  URL https://gitlab.cern.ch/geant4/geant4/-/archive/v${GEANT4_VERSION}/geant4-v${GEANT4_VERSION}.tar.gz
+  URL_HASH SHA1=69119e8a29d3bd79b70886dc7ae78e6d008e1753
+  CMAKE_ARGS 
+  -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+  -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}/geant4/${GEANT4_VERSION}
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}
+  -DGEANT4_BUILD_TLS_MODEL=global-dynamic
+  -DGEANT4_INSTALL_DATA=OFF
+  -DGEANT4_USE_GDML=ON
+  -DGEANT4_USE_SYSTEM_EXPAT=ON
+  -DGEANT4_USE_SYSTEM_ZLIB=ON
+  BUILD_COMMAND ${CMAKE_COMMAND} -E env CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL} ${CMAKE_COMMAND} --build <BINARY_DIR>
+)
+
+ExternalProject_Add(hepmc3
+  PREFIX hepmc3
+  URL https://gitlab.cern.ch/hepmc/HepMC3/-/archive/${HEPMC3_VERSION}/HepMC3-${HEPMC3_VERSION}.tar.gz
+  URL_HASH SHA1=d4c12f5d50a507cd60cf2377286cbd23f59f1f84
+  CMAKE_ARGS
+  -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}/hepmc3/${HEPMC3_VERSION}
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}
+  -DHEPMC3_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+  -DHEPMC3_BUILD_STATIC_LIBS=OFF
+  -DHEPMC3_ENABLE_PYTHON=OFF
+  -DHEPMC3_ENABLE_ROOTIO=OFF
+  -DHEPMC3_ENABLE_SEARCH=OFF
+  BUILD_COMMAND ${CMAKE_COMMAND} -E env CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL} ${CMAKE_COMMAND} --build <BINARY_DIR>
+)
+
+# Hard-coding the compile flags is not ideal, but seems needed
+set(pythia_configure  "./configure")
+set(pythia_cxx_common "-O2 -std=c++${CMAKE_CXX_STANDARD} -pedantic -W -Wall -Wshadow -fPIC -pthread")
+if(APPLE)
+  list(APPEND pythia_configure "--cxx-common='-isysroot ${CMAKE_OSX_SYSROOT} ${pythia_cxx_common}'")
+else()
+  list(APPEND pythia_configure "${pythia_cxx_common}")
+endif()
+
+ExternalProject_Add(pythia8
+  PREFIX pythia8 
+  DEPENDS PythonExeExists
+  URL https://pythia.org/download/pythia83/pythia8${PYTHIA8_VERSION}.tgz
+  URL_HASH SHA1=3186d9c289914896838f1050610121870854eb36
+  BUILD_IN_SOURCE ON
+  PATCH_COMMAND patch -p1 -i ${CMAKE_CURRENT_SOURCE_DIR}/pythia8-forward-decl.patch
+  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CXX=${CMAKE_CXX_COMPILER} ${pythia_configure}
+  BUILD_COMMAND make -j${CMAKE_BUILD_PARALLEL_LEVEL}
+)
+
+ExternalProject_Add(nlohmann_json
+  PREFIX nlohmann_json
+  URL https://github.com/nlohmann/json/archive/refs/tags/v${JSON_VERSION}.tar.gz
+  URL_HASH SHA1=1b0701dc7fdc068aad8ce68fc3e019a038232437
+  CMAKE_ARGS
+  -DJSON_BuildTests=OFF
+  -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}/nlohmann_json/${JSON_VERSION}
+)
+
+ExternalProject_Add(root
+  PREFIX root
+  DEPENDS nlohmann_json PythonExeExists tbb
+  URL https://root.cern/download/root_v${ROOT_VERSION}.source.tar.gz
+  URL_HASH ${ROOT_HASH}
+  LIST_SEPARATOR |
+  CMAKE_ARGS
+  -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+  -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}/root/${ROOT_VERSION}
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}/nlohmann_json/${JSON_VERSION}|${CMAKE_INSTALL_PREFIX}/tbb/${TBB_VERSION}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+  -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  -DPython_EXECUTABLE=${Python_EXECUTABLE}
+  -DPython3_EXECUTABLE=${Python_EXECUTABLE}
+  -Dfail-on-missing=ON
+  -Dgdml=ON
+  -Dx11=ON
+  -Dpyroot=ON
+  -Ddataframe=ON
+  -Dmysql=OFF
+  -Doracle=OFF
+  -Dpgsql=OFF
+  -Dsqlite=OFF
+  -Dpythia6=OFF
+  -Dpythia8=OFF
+  -Dfftw3=OFF
+  -Dbuiltin_tbb=OFF
+  -Dbuiltin_cfitsio=ON
+  -Dbuiltin_xxhash=ON
+  -Dbuiltin_afterimage=ON
+  -Dbuiltin_openssl=OFF
+  -Dbuiltin_ftgl=ON
+  -Dbuiltin_gsl=ON
+  -Dbuiltin_gl2ps=ON
+  -Dbuiltin_glew=ON
+  -Dbuiltin_pcre=ON
+  -Dgfal=OFF
+  -Ddavix=OFF
+  -Dbuiltin_vdt=ON
+  -Dxrootd=OFF
+  -Dtmva=OFF
+  BUILD_COMMAND ${CMAKE_COMMAND} -E env CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL} ${CMAKE_COMMAND} --build <BINARY_DIR>
+)
+
+
+ExternalProject_Add(podio
+  PREFIX podio
+  DEPENDS root PythonExeExists
+  URL https://github.com/AIDASoft/podio/archive/refs/tags/v${PODIO_VERSION}.tar.gz
+  URL_HASH SHA1=600b99000f0c7a6c25c04a8b32bebf70413c9f57
+  LIST_SEPARATOR |
+  CMAKE_ARGS
+  -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+  -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}/podio/${PODIO_VERSION}
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  -DPython_EXECUTABLE=${Python_EXECUTABLE}
+  -DCMAKE_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}/root/${ROOT_VERSION}|${CMAKE_INSTALL_PREFIX}/nlohmann_json/${JSON_VERSION}
+  -DBUILD_TESTING=OFF
+  -DUSE_EXTERNAL_CATCH2=OFF
+  BUILD_COMMAND ${CMAKE_COMMAND} -E env CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL} ${CMAKE_COMMAND} --build <BINARY_DIR>
+)
+
+set(venv_dir ${CMAKE_CURRENT_BINARY_DIR}/venv)
+set(venv_python_exe ${venv_dir}/bin/python)
+
+add_custom_command(OUTPUT ${venv_python_exe}
+                   COMMAND ${Python_EXECUTABLE} -m venv ${venv_dir} && ${venv_python_exe} -m pip install --upgrade pip jinja2 pyyaml
+                   COMMENT "Creating virtualenv for edm4hep build"
+                   DEPENDS PythonExeExists)
+
+add_custom_target(PythonVenv DEPENDS ${venv_python_exe})
+
+ExternalProject_Add(edm4hep
+  PREFIX edm4hep
+  DEPENDS podio PythonVenv
+  URL https://github.com/key4hep/EDM4hep/archive/refs/tags/v${EDM4HEP_VERSION}.tar.gz
+  URL_HASH SHA1=7781f6c85bd2e88480b699a3a554182fd8bb75bf
+  LIST_SEPARATOR |
+  CMAKE_ARGS
+  -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+  -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}/edm4hep/${EDM4HEP_VERSION}
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}/root/${ROOT_VERSION}|${CMAKE_INSTALL_PREFIX}/podio/${PODIO_VERSION}|${CMAKE_INSTALL_PREFIX}/nlohmann_json/${JSON_VERSION}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  -DPython_EXECUTABLE=${venv_python_exe}
+  -DBUILD_TESTING=OFF
+  -DUSE_EXTERNAL_CATCH2=OFF
+  BUILD_COMMAND ${CMAKE_COMMAND} -E env CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL} ${CMAKE_COMMAND} --build <BINARY_DIR>
+)
+
+ExternalProject_Add(dd4hep
+  PREFIX dd4hep
+  DEPENDS edm4hep geant4 PythonExeExists boost
+  URL https://github.com/AIDASoft/DD4hep/archive/v${DD4HEP_VERSION}.tar.gz
+  URL_HASH SHA1=3e8a1d07a72689a24db04466b263094bbe16240f
+  LIST_SEPARATOR |
+  PATCH_COMMAND patch -p1 -i ${CMAKE_CURRENT_SOURCE_DIR}/dd4hep-python.patch
+  BUILD_COMMAND ${CMAKE_COMMAND} -E env LD_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX}/geant4/${GEANT4_VERSION}/lib CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL} ${CMAKE_COMMAND} --build <BINARY_DIR>
+  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env LD_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX}/geant4/${GEANT4_VERSION}/lib  ${CMAKE_COMMAND} -S <SOURCE_DIR> -B <BINARY_DIR>
+  -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+  -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}/dd4hep/${DD4HEP_VERSION}
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_PREFIX_PATH=${CMAKE_INSTALL_PREFIX}/root/${ROOT_VERSION}|${CMAKE_INSTALL_PREFIX}/podio/${PODIO_VERSION}|${CMAKE_INSTALL_PREFIX}/edm4hep/${EDM4HEP_VERSION}|${CMAKE_INSTALL_PREFIX}/geant4/${GEANT4_VERSION}|${CMAKE_INSTALL_PREFIX}/nlohmann_json/${JSON_VERSION}|${CMAKE_INSTALL_PREFIX}/boost/${BOOST_VERSION}
+  -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=14.2
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  -DPython_EXECUTABLE=${Python_EXECUTABLE}
+  -DBUILD_TESTING=OFF
+  -DDD4HEP_BUILD_PACKAGES=DDG4|DDDetectors|DDRec|UtilityApps
+  -DDD4HEP_USE_GEANT4=ON
+  -DDD4HEP_USE_XERCESC=ON
+  -DDD4HEP_USE_EDM4HEP=ON
+)
+
+
