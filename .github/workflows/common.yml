@@ -26,4 +26,4 @@ jobs:
       - name: Set up Spack
         uses: spack/setup-spack@v2
 
-      - run: spack -e . install --no-check-signature --only dependencies acts+tgeo+geomodel+podio+edm4hep+examples+odd+fatras+json ^ root~opengl
+      - run: spack -e . install --no-check-signature
