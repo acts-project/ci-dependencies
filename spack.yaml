@@ -1,5 +1,5 @@
 spack:
-  view: true
+  view: /opt/view
   specs:
     - boost@1.85.0
     - cmake@3.30.1
@@ -13,7 +13,7 @@ spack:
 
   config:
     install_tree:
-      root: install
+      root: /opt/spack
       padded_length: 128
 
   mirrors:
