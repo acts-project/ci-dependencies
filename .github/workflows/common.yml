@@ -7,15 +7,6 @@ on:
         required: true
         type: string
 
-env:
-  BUILD_DIR: ${{ github.workspace }}/build
-  INSTALL_DIR: ${{ github.workspace }}/dependencies
-
-  CCACHE_DIR: ${{ github.workspace }}/ccache
-  CCACHE_MAXSIZE: 10G
-
-  CXX_STANDARD: "20"
-
 jobs:
 
   build:
