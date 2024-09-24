@@ -19,6 +19,7 @@ set(DD4HEP_VERSION 01-29)
 set(BOOST_VERSION 1.84.0)
 set(EIGEN_VERSION 3.4.0)
 set(GEOMODEL_VERSION 6.3.0)
+set(FASTJET_VERSION 3.4.3)
 
 if(POLICY CMP0135)
   cmake_policy(SET CMP0135 NEW)
@@ -499,6 +500,15 @@ ExternalProject_Add(dd4hep
   -DDD4HEP_USE_GEANT4=ON
   -DDD4HEP_USE_XERCESC=ON
   -DDD4HEP_USE_EDM4HEP=ON
+)
+
+ExternalProject_Add(fastjet
+  PREFIX fastjet
+  DEPENDS PythonExeExists
+  URL https://fastjet.fr/repo/fastjet-${FASTJET_VERSION}.tar.gz
+  URL_HASH SHA256=cc175471bfab8656b8c6183a8e5e9ad05d5f7506e46f3212a9a8230905b8f6a3
+  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CXX=${CMAKE_CXX_COMPILER} <SOURCE_DIR>/configure --prefix=${CMAKE_INSTALL_PREFIX} --enable-allplugins --enable-pyext
+  BUILD_COMMAND make -j${CMAKE_BUILD_PARALLEL_LEVEL}
 )
 
 option(BUILD_ACTS "Build ACTS" OFF)
