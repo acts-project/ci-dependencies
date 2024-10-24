@@ -1,5 +1,6 @@
 spack:
-  view: /opt/view
+  # view: /opt/view
+  view: true
   specs:
     - boost@1.85.0
     - cmake@3.30.1
@@ -9,11 +10,14 @@ spack:
     - intel-tbb@2021.12.0
     - nlohmann-json@3.11.3
     - podio@1.0.1
-    - root@6.32.02~opengl
+    - root@6.32.02
+
+  concretizer:
+    unify: true
 
   config:
     install_tree:
-      root: /opt/spack
+      # root: /opt/spack
       padded_length: 128
 
   mirrors:
