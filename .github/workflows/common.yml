@@ -23,7 +23,6 @@ jobs:
           sudo chown $USER /opt/view
       - run: |
           eval `spack env activate --sh .`
-          spack env activate .
           spack find
           spack concretize
           spack install --no-check-signature
