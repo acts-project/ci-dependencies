@@ -46,21 +46,16 @@ jobs:
           echo "Listing 25 largest packages"
           dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 25
           echo "Removing large packages"
-          function nuke {
-            $(sudo dpkg --status $1 &> /dev/null)
-            if [[ $? -eq 0 ]]; then
-              sudo apt-get remove -y $1
-            fi
-          }
-          sudo apt-get remove -y '^dotnet-.*'
-          sudo apt-get remove -y '^llvm-.*'
-          nuke -y azure-cli
-          nuke -y google-cloud-cli
-          nuke -y google-chrome-stable
-          nuke -y firefox
-          nuke -y powershell
-          nuke -y mono-devel
-          sudo apt-get remove -y '^temurin.*'
+          sudo apt-get remove -y '^dotnet-.*' || true
+          sudo apt-get remove -y '^llvm-.*' || true
+          sudo apt-get remove -y '^libllvm-.*' || true
+          sudo apt-get remove -y azure-cli || true
+          sudo apt-get remove -y google-cloud-cli || true
+          sudo apt-get remove -y google-chrome-stable || true
+          sudo apt-get remove -y firefox || true
+          sudo apt-get remove -y powershell || true
+          sudo apt-get remove -y mono-devel || true
+          sudo apt-get remove -y '^temurin.*' || true
           sudo apt-get autoremove -y
           sudo apt-get clean
           rm -rf /usr/share/dotnet/
