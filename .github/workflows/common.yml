@@ -54,7 +54,6 @@ jobs:
           }
           sudo apt-get remove -y '^dotnet-.*'
           sudo apt-get remove -y '^llvm-.*'
-          sudo apt-get remove -y '^libllvm-.*'
           nuke -y azure-cli
           nuke -y google-cloud-cli
           nuke -y google-chrome-stable
