@@ -49,12 +49,12 @@ jobs:
           sudo apt-get remove -y '^dotnet-.*'
           sudo apt-get remove -y '^llvm-.*'
           sudo apt-get remove -y '^libllvm-.*'
-          sudo apt-get remove -y azure-cli
-          sudo apt-get remove -y google-cloud-cli
-          sudo apt-get remove -y google-chrome-stable
-          sudo apt-get remove -y firefox
-          sudo apt-get remove -y powershell
-          sudo apt-get remove -y mono-devel
+          sudo dpkg --remove azure-cli
+          sudo dpkg --remove google-cloud-cli
+          sudo dpkg --remove google-chrome-stable
+          sudo dpkg --remove firefox
+          sudo dpkg --remove powershell
+          sudo dpkg --remove mono-devel
           sudo apt-get remove -y '^temurin.*'
           sudo apt-get autoremove -y
           sudo apt-get clean
