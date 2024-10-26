@@ -49,19 +49,19 @@ jobs:
           function nuke {
             $(dpkg --status $1 &> /dev/null)
             if [[ $? -eq 0 ]]; then
-              apt-get remove -y $1
+              sudo apt-get remove -y $1
             fi
           }
           apt-get --yes --purge remove $pkgToRemoveList
           sudo apt-get remove -y '^dotnet-.*'
           sudo apt-get remove -y '^llvm-.*'
           sudo apt-get remove -y '^libllvm-.*'
-          sudo nuke -y azure-cli
-          sudo nuke -y google-cloud-cli
-          sudo nuke -y google-chrome-stable
-          sudo nuke -y firefox
-          sudo nuke -y powershell
-          sudo nuke -y mono-devel
+          nuke -y azure-cli
+          nuke -y google-cloud-cli
+          nuke -y google-chrome-stable
+          nuke -y firefox
+          nuke -y powershell
+          nuke -y mono-devel
           sudo apt-get remove -y '^temurin.*'
           sudo apt-get autoremove -y
           sudo apt-get clean
