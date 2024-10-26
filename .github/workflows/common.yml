@@ -23,12 +23,11 @@ jobs:
       #     sudo chown $USER /opt/view
       #
 #
-      - name: Release some disk spaces for macos build, remove old xcode versions ...
+      - name: Remove XCode versions to save disk
         if: startsWith(inputs.os, 'macos')
         run: |
           echo "Disk spaces before cleanup"
           sudo df -h
-          sudo du -sh /*
           echo "Searching for Xcode versions:"
           find /Applications -name "Xcode_*" -maxdepth 1 -mindepth 1
           # https://github.com/actions/runner-images/issues/2840#issuecomment-2334584217
@@ -38,7 +37,29 @@ jobs:
           find /Applications -name "Xcode_*" -maxdepth 1 -mindepth 1
           echo "Disk spaces after cleanup"
           sudo df -h
-          sudo du -sh /*
+
+      - name: Remove packages to save disk
+        if: startsWith(inputs.os, 'ubuntu')
+        run: |
+          df -h
+          sudo apt-get update
+          echo "Listing 25 largest packages"
+          dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 25
+          echo "Removing large packages"
+          sudo apt-get remove -y '^dotnet-.*'
+          sudo apt-get remove -y '^llvm-.*'
+          sudo apt-get remove -y '^libllvm-.*'
+          sudo apt-get remove -y azure-cli
+          sudo apt-get remove -y google-cloud-cli
+          sudo apt-get remove -y google-chrome-stable
+          sudo apt-get remove -y firefox
+          sudo apt-get remove -y powershell
+          sudo apt-get remove -y mono-devel
+          sudo apt-get remove -y '^temurin.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          rm -rf /usr/share/dotnet/
+          df -h
 
       - name: Run spack build
         run: |

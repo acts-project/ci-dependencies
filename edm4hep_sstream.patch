@@ -1,0 +1,12 @@
+diff --git a/tools/include/edm4hep2json.hxx b/tools/include/edm4hep2json.hxx
+index 9bd944e..a90fad2 100644
+--- a/tools/include/edm4hep2json.hxx
++++ b/tools/include/edm4hep2json.hxx
+@@ -28,6 +28,7 @@
+ #include <exception>
+ #include <fstream>
+ #include <iostream>
++#include <sstream>
+ #include <vector>
+ 
+ nlohmann::json processEvent(const podio::Frame& frame, std::vector<std::string>& collList, bool verboser,

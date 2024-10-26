@@ -1,0 +1,32 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e282c31a..c093c769 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -14,6 +14,11 @@ SET( DD4hep_VERSION_PATCH 1 )
+ # Basic project setup #
+ #######################
+ 
++# Unbreak the python finding process
++message(STATUS "Input: ${Python_EXECUTABLE}")
++FIND_PACKAGE(Python REQUIRED COMPONENTS Interpreter Development)
++message(STATUS "Resolved to: ${Python_VERSION}")
++
+ set ( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake )
+ 
+ IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+diff --git a/cmake/DD4hepBuild.cmake b/cmake/DD4hepBuild.cmake
+index bcd3407f..cdba7179 100644
+--- a/cmake/DD4hepBuild.cmake
++++ b/cmake/DD4hepBuild.cmake
+@@ -671,6 +671,11 @@ function(dd4hep_add_plugin binary)
+   endif()
+ endfunction(dd4hep_add_plugin)
+ 
++# Unbreak the python finding process
++message(STATUS "Input: ${Python_EXECUTABLE}")
++FIND_PACKAGE(Python REQUIRED COMPONENTS Interpreter Development)
++message(STATUS "Resolved to: ${Python_VERSION}")
++
+ 
+ #
+ # Macro to set up ROOT:: targets so that we can use the same code for root 6.8 and for root 6.10 and beyond
