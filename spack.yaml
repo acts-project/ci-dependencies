@@ -1,23 +1,29 @@
 spack:
-  # view: /opt/view
   view: true
   specs:
-  - boost@1.85.0
-  - cmake@3.30.1
-  - edm4hep@0.10.5
-  - eigen@3.4.0
-  - git-lfs@3.5.1
-  - intel-tbb@2021.12.0
-  - nlohmann-json@3.11.3
-  - podio@1.0.1
-  - root@6.32.02
+    - boost@1.85.0 +program_options +test
+    - cmake@3.30.1
+    - edm4hep@0.10.5
+    - eigen@3.4.0
+    - git-lfs@3.5.1
+    - intel-tbb@2021.12.0
+    - nlohmann-json@3.11.3
+    - podio@1.0.1
+    - root@6.32.02
+
+  packages:
+    all:
+      target: 
+        - aarch64
+        - x86_64
+      variants:
+        cxxstd=20 build_type=Release
 
   concretizer:
-    unify: true
+    unify: when_possible
 
   config:
     install_tree:
-      # root: /opt/spack
       padded_length: 128
 
   mirrors:
