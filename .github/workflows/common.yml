@@ -11,18 +11,14 @@ jobs:
 
   build:
     runs-on: "${{ inputs.os }}"
+    container:
+      image: ${{ inputs.image || '' }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Spack
         uses: spack/setup-spack@v2
 
-      # - run: |
-      #     sudo mkdir -p /opt/spack /opt/view
-      #     sudo chown $USER /opt/spack
-      #     sudo chown $USER /opt/view
-      #
-#
       - name: Remove XCode versions to save disk
         if: startsWith(inputs.os, 'macos')
         run: |
