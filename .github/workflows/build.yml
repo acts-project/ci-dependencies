@@ -16,11 +16,13 @@ jobs:
       fail-fast: false
       matrix:
         image: ["none"]
+        os:
+         - macos-14
+         - macos-15
+         - ubuntu-22.04
+         - ubuntu-24.04
+
         include:
-         - os: macos-14
-         - os: macos-15
-         - os: ubuntu-22.04
-         - os: ubuntu-24.04
          - os: ubuntu-24.04
            image: ghcr.io/acts-project/alma9-base:67
     uses: ./.github/workflows/common.yml
