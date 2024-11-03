@@ -33,6 +33,8 @@ jobs:
       - name: Locate OpenGL
         run: ./opengl.sh
 
+      - uses: mxschmitt/action-tmate@v3
+
       - name: Remove XCode versions to save disk
         if: startsWith(inputs.os, 'macos')
         run: |
