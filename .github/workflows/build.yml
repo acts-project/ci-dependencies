@@ -11,22 +11,29 @@ on:
 
 
 jobs:
-  build_matrix:
+  build_native:
     strategy:
       fail-fast: false
       matrix:
-        image: ["none"]
         os:
          - macos-14
          - macos-15
          - ubuntu-22.04
          - ubuntu-24.04
-
-        include:
-         - os: ubuntu-24.04
-           image: ghcr.io/acts-project/alma9-base:67
     uses: ./.github/workflows/common.yml
     with:
       os: ${{ matrix.os }}
+      image: ${{ matrix.image }}
+    secrets: inherit
+
+  build_container:
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - ghcr.io/acts-project/alma9-base:67
+    uses: ./.github/workflows/common.yml
+    with:
+      os: ubuntu-latest
       image: ${{ matrix.image }}
     secrets: inherit
