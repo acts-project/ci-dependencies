@@ -72,7 +72,7 @@ jobs:
         run: |
           eval `spack env activate --sh .`
           spack find
-          spack concretize
+          spack concretize -Uf
           spack install --no-check-signature
 
       - name: Push packages and update index
