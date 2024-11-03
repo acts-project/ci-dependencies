@@ -10,7 +10,7 @@ packages_file=~/.spack/packages.yaml
 
 if [ "$os" == "ubuntu" ]; then
   sudo apt-get update
-  sudo apt-get install -y mesa-utils libgl1-mesa-dev
+  sudo apt-get install -y libgl1-mesa-dev
 cat <<EOF > $packages_file
     packages:
       opengl:
@@ -20,7 +20,7 @@ cat <<EOF > $packages_file
           spec: opengl@4.5
 EOF
 elif [ "$os" == "almalinux" ]; then
-  dnf install mesa-libGLU glx-utils
+  dnf install -y mesa-libGLU
 cat <<EOF > $packages_file
     packages:
       opengl:
