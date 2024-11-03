@@ -25,4 +25,5 @@ jobs:
     uses: ./.github/workflows/common.yml
     with:
       os: ${{ matrix.os }}
+      image: ${{ matrix.image }}
     secrets: inherit
