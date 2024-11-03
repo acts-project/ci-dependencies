@@ -26,5 +26,5 @@ jobs:
     uses: ./.github/workflows/common.yml
     with:
       os: ${{ matrix.os }}
-      image: ${{ matrix.image == 'none' && '' || marix.image }}
+      image: ${{ matrix.image == 'none' && '' || matrix.image }}
     secrets: inherit
