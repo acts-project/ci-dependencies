@@ -68,6 +68,10 @@ jobs:
           rm -rf /usr/share/dotnet/
           df -h
 
+      - name: Locate OpenGL
+        if: "!startsWith(inputs.os, 'macos')"
+        run: spack external find opengl
+
       - name: Run spack build
         run: |
           eval `spack env activate --sh .`
