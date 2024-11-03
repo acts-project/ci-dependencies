@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [none]
+        image: [""]
         include:
          - os: macos-14
          - os: macos-15
@@ -26,5 +26,5 @@ jobs:
     uses: ./.github/workflows/common.yml
     with:
       os: ${{ matrix.os }}
-      image: ${{ matrix.image == 'none' && '' || matrix.image }}
+      image: ${{ matrix.image }}
     secrets: inherit

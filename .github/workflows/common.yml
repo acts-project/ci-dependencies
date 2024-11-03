@@ -6,6 +6,10 @@ on:
       os:
         required: true
         type: string
+      image:
+        required: false
+        type: string
+        default: ""
 
 jobs:
 
