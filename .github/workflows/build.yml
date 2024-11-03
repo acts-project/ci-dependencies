@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [""]
+        image: ["none"]
         include:
          - os: macos-14
          - os: macos-15

@@ -16,12 +16,15 @@ jobs:
   build:
     runs-on: "${{ inputs.os }}"
     container:
-      image: ${{ inputs.image || '' }}
+      image: ${{ inputs.image == 'none' && '' || inputs.image }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Spack
         uses: spack/setup-spack@v2
+
+      # Need a git user so we can apply patches
+      - uses: fregante/setup-git-user@v2
 
       - name: Apply spack patch
         working-directory: spack
