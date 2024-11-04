@@ -79,6 +79,18 @@ jobs:
       - uses: mxschmitt/action-tmate@v3
         if: failure()
 
+        # Calculate base image for the build cache
+      - run: |
+          if [ "${{ inputs.image }}" != "none" ]; then
+            echo "BASE_IMAGE=${{ inputs.image }}" >> $GITHUB_ENV
+          elif [ "${{ inputs.os }}" == "ubuntu-22.04 ]; then
+            echo "BASE_IMAGE=ubuntu:22.04" >> $GITHUB_ENV
+          elif [ "${{ inputs.os }}" == "ubuntu-24.04 ]; then
+            echo "BASE_IMAGE=ubuntu:24.04" >> $GITHUB_ENV
+          else
+            echo "BASE_IMAGE=ubuntu:24.04" >> $GITHUB_ENV
+          fi
+
       - name: Push packages and update index
         run: |
           spack -e . mirror set --push --oci-username ${{ github.actor }} --oci-password "${{ secrets.GITHUB_TOKEN }}" local-buildcache
