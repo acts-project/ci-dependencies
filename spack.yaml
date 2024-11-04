@@ -11,7 +11,7 @@ spack:
     - podio@1.0.1
     - root@6.32.06 +aqua+opengl
     - dd4hep@1.29
-    - geomodel@6.3.0
+    - geomodel@6.3.0 +geomodelg4
     - py-pybind11 @2.13.1
     - python@3.12
     - hepmc3@3.3.0
