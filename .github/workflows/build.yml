@@ -19,8 +19,8 @@ jobs:
          - macos-14
          - macos-15
         xcode:
-         - "15.0"
-         - "16.0"
+         - "15.0.1"
+         - "16.0.0"
     uses: ./.github/workflows/common.yml
     with:
       os: ${{ matrix.os }}
