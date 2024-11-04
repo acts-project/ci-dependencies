@@ -33,7 +33,6 @@ jobs:
       - name: Locate OpenGL
         run: ./opengl.sh
 
-      - uses: mxschmitt/action-tmate@v3
 
       - name: Remove XCode versions to save disk
         if: startsWith(inputs.os, 'macos')
@@ -79,6 +78,9 @@ jobs:
           spack find
           spack concretize -Uf
           spack install --no-check-signature
+
+      - uses: mxschmitt/action-tmate@v3
+        if: failure()
 
       - name: Push packages and update index
         run: |
