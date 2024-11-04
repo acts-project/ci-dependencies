@@ -10,6 +10,10 @@ on:
         required: false
         type: string
         default: ""
+      xcode:
+        required: false
+        type: string
+        default: "latest-stable"
 
 jobs:
 
@@ -34,21 +38,11 @@ jobs:
       - name: Locate OpenGL
         run: ./opengl.sh
 
-
       - name: Remove XCode versions to save disk
         if: startsWith(inputs.os, 'macos')
-        run: |
-          echo "Disk spaces before cleanup"
-          sudo df -h
-          echo "Searching for Xcode versions:"
-          find /Applications -name "Xcode_*" -maxdepth 1 -mindepth 1
-          # https://github.com/actions/runner-images/issues/2840#issuecomment-2334584217
-          echo "Remove all but the latest Xcode..."
-          find /Applications/ -name "Xcode*" | sort -r | tail --lines=+2 | xargs rm -rf
-          echo "Available Xcode versions after removal:"
-          find /Applications -name "Xcode_*" -maxdepth 1 -mindepth 1
-          echo "Disk spaces after cleanup"
-          sudo df -h
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "${{ matrix.xcode }}"
 
       - name: Remove packages to save disk
         if: startsWith(inputs.os, 'ubuntu') && inputs.image == ''
@@ -73,12 +67,14 @@ jobs:
           rm -rf /usr/share/dotnet/
           df -h
 
-      - name: Run spack build
+      - name: Spack concretize
         run: |
-          eval `spack env activate --sh .`
-          spack find
-          spack concretize -Uf
-          spack install --no-check-signature
+          spack -e . concretize -Uf
+          spack -e . find
+
+      - name: Spack build
+        run: |
+          spack -e . install --no-check-signature
 
       - uses: mxschmitt/action-tmate@v3
         if: failure()

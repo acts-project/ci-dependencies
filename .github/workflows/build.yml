@@ -11,19 +11,32 @@ on:
 
 
 jobs:
-  build_native:
+  build_macos:
     strategy:
       fail-fast: false
       matrix:
         os:
          - macos-14
          - macos-15
+        xcode:
+         - "15.0"
+         - "16.0"
+    uses: ./.github/workflows/common.yml
+    with:
+      os: ${{ matrix.os }}
+      xcode: ${{ matrix.xcode }}
+    secrets: inherit
+
+  build_native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
          - ubuntu-22.04
          - ubuntu-24.04
     uses: ./.github/workflows/common.yml
     with:
       os: ${{ matrix.os }}
-      image: ${{ matrix.image }}
     secrets: inherit
 
   build_container:
