@@ -38,11 +38,11 @@ jobs:
       - name: Locate OpenGL
         run: ./opengl.sh
 
-      - name: Remove XCode versions to save disk
+      - name: Setup Xcode version
         if: startsWith(inputs.os, 'macos')
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "${{ matrix.xcode }}"
+          xcode-version: "${{ inputs.xcode }}"
 
       - name: Remove packages to save disk
         if: startsWith(inputs.os, 'ubuntu') && inputs.image == ''
