@@ -80,17 +80,19 @@ jobs:
       - uses: mxschmitt/action-tmate@v3
         if: failure()
 
-        # Calculate base image for the build cache
-      - run: |
+      - name: Derive base image for the build cache
+        run: |
           if [ "${{ inputs.image }}" != "none" ]; then
-            echo "BASE_IMAGE=${{ inputs.image }}" >> $GITHUB_ENV
+            export BASE_IMAGE="${{ inputs.image }}"
           elif [ "${{ inputs.os }}" == "ubuntu-22.04 ]; then
-            echo "BASE_IMAGE=ubuntu:22.04" >> $GITHUB_ENV
+            export BASE_IMAGE="ubuntu:22.04"
           elif [ "${{ inputs.os }}" == "ubuntu-24.04 ]; then
-            echo "BASE_IMAGE=ubuntu:24.04" >> $GITHUB_ENV
+            export BASE_IMAGE="ubuntu:24.04"
           else
-            echo "BASE_IMAGE=ubuntu:24.04" >> $GITHUB_ENV
+            export BASE_IMAGE="ubuntu:24.04"
           fi
+          echo "BASE IMAGE: ${BASE_IMAGE}"
+          echo "BASE_IMAGE=${BASE_IMAGE}" >> $GITHUB_ENV
 
       - name: Push packages and update index
         run: |
