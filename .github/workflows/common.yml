@@ -76,8 +76,8 @@ jobs:
         run: |
           spack -e . install --no-check-signature
 
-      - uses: mxschmitt/action-tmate@v3
-        if: failure()
+      # - uses: mxschmitt/action-tmate@v3
+      #   if: failure()
 
       - name: Derive base image for the build cache
         run: |
