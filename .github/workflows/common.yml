@@ -82,7 +82,7 @@ jobs:
 
       - name: Derive base image for the build cache
         run: |
-          if [ "${{ inputs.image }}" != "none" ]; then
+          if [ "${{ inputs.image }}" != "" ]; then
             export BASE_IMAGE="${{ inputs.image }}"
           elif [ "${{ inputs.os }}" == "ubuntu-22.04 ]; then
             export BASE_IMAGE="ubuntu:22.04"
