@@ -1,7 +1,7 @@
 spack:
   view: true
   specs:
-    - boost@1.85.0 +program_options +test
+    - boost@1.86.0 +program_options +test
     - cmake@3.30.1
     - edm4hep@0.10.5
     - eigen@3.4.0
@@ -10,7 +10,7 @@ spack:
     - nlohmann-json@3.11.3
     - podio@1.0.1
     - root@6.32.06 +aqua+opengl
-    - dd4hep@1.29
+    - dd4hep@1.29 +xercesc
     - geomodel@6.3.0 +geomodelg4
     - py-pybind11 @2.13.1
     - python@3.12
