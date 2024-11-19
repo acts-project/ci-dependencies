@@ -98,5 +98,5 @@ jobs:
           GH_OCI_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         run: |
           spack -e . mirror set --push acts-spack-buildcache
-          spack -e . buildcache push --base-image ${{ env.BASE_IMAGE }} --unsigned --update-index acts-spack-buildcache
+          spack -e . buildcache push --base-image ${{ env.BASE_IMAGE }} --unsigned
         if: ${{ !cancelled() }}
