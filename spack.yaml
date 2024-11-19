@@ -31,6 +31,7 @@ spack:
   config:
     install_tree:
       padded_length: 128
+    connect_timeout: 60
 
   mirrors:
     acts-spack-buildcache:
