@@ -33,7 +33,9 @@ spack:
       padded_length: 128
 
   mirrors:
-    local-buildcache:
+    acts-spack-buildcache:
       url: oci://ghcr.io/acts-project/spack-buildcache
       signed: false
-
+      access_pair:
+        id_variable: GH_OCI_USER
+        secret_variable: GH_OCI_TOKEN
