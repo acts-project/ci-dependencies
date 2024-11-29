@@ -11,15 +11,43 @@ on:
 
 
 jobs:
-  build_matrix:
+  build_macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+         - os: macos-14
+           xcode: "15.0.1"
+         - os: macos-14
+           xcode: "16.0.0"
+         - os: macos-15
+           xcode: "16.0.0"
+    uses: ./.github/workflows/common.yml
+    with:
+      os: ${{ matrix.os }}
+      xcode: ${{ matrix.xcode }}
+    secrets: inherit
+
+  build_native:
     strategy:
       fail-fast: false
       matrix:
         os:
-          - macos-14
-          - ubuntu-22.04
-          - ubuntu-24.04
+         - ubuntu-22.04
+         - ubuntu-24.04
     uses: ./.github/workflows/common.yml
     with:
       os: ${{ matrix.os }}
+    secrets: inherit
+
+  build_container:
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - ghcr.io/acts-project/alma9-base:67
+    uses: ./.github/workflows/common.yml
+    with:
+      os: ubuntu-latest
+      image: ${{ matrix.image }}
     secrets: inherit
