@@ -269,6 +269,21 @@ ExternalProject_Add(eigen
   -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}
 )
 
+ExternalProject_Add(xerces-c
+  PREFIX xerces-c
+  URL https://dlcdn.apache.org//xerces/c/3/sources/xerces-c-3.3.0.tar.gz
+  URL_HASH SHA256=9555f1d06f82987fbb4658862705515740414fd34b4db6ad2ed76a2dc08d3bde
+  CMAKE_ARGS
+  -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+  -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+  -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}
+)
+
+
 ExternalProject_Add(tbb
   PREFIX tbb
   URL https://github.com/oneapi-src/oneTBB/archive/refs/tags/v${TBB_VERSION}.tar.gz
@@ -477,7 +492,7 @@ ExternalProject_Add(edm4hep
 
 ExternalProject_Add(dd4hep
   PREFIX dd4hep
-  DEPENDS edm4hep geant4 PythonExeExists boost nlohmann_json
+  DEPENDS edm4hep geant4 PythonExeExists boost nlohmann_json xerces-c
   URL https://github.com/AIDASoft/DD4hep/archive/v${DD4HEP_VERSION}.tar.gz
   URL_HASH SHA256=435d25a7ef093d8bf660f288b5a89b98556b4c1c293c55b93bf641fb4cba77e9
   LIST_SEPARATOR |
