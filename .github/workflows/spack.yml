@@ -56,7 +56,7 @@ jobs:
 
 
       - name: Remove packages to save disk
-        if: startsWith(inputs.os, 'ubuntu') && inputs.image == ''
+        if: startsWith(inputs.os, 'ubuntu')
         run: |
           df -h
           sudo apt-get update
