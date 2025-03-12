@@ -26,6 +26,8 @@ spack:
       - aarch64
       - x86_64
       variants: cxxstd=20 build_type=Release
+    mesa:
+      buildable: false
 
   concretizer:
     unify: true
