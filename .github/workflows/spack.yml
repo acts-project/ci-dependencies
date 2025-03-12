@@ -60,7 +60,7 @@ jobs:
             -e "GITHUB_ENV=/github_env" \
             -w /build \
             ${{ inputs.image }} \
-            ./spack_build.sh
+            /src/spack_build.sh
 
       - name: Run spack build on host
         if: "${{ inputs.image == '' }}"
