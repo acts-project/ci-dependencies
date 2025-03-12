@@ -80,25 +80,25 @@ jobs:
             compiler: gcc@11.5.0
             default: true
 
-          # - image: ghcr.io/acts-project/ubuntu2204:74
-          #   compiler: gcc@11.4.0
-          #   default: true
-          #
-          # - image: ghcr.io/acts-project/ubuntu2204:74
-          #   compiler: clang@14.0.0
-          #   default: false
-          #
-          # - image: ghcr.io/acts-project/ubuntu2404:74
-          #   compiler: gcc@13.3.0
-          #   default: true
-          #
-          # - image: ghcr.io/acts-project/ubuntu2404:74
-          #   compiler: clang@18.1.3
-          #   default: false
-          #
-          # - image: ghcr.io/acts-project/ubuntu2404_clang19:74
-          #   compiler: clang@19.1.6
-          #   default: false
+          - image: ghcr.io/acts-project/ubuntu2204:74
+            compiler: gcc@11.4.0
+            default: true
+
+          - image: ghcr.io/acts-project/ubuntu2204:74
+            compiler: clang@14.0.0
+            default: false
+
+          - image: ghcr.io/acts-project/ubuntu2404:74
+            compiler: gcc@13.3.0
+            default: true
+
+          - image: ghcr.io/acts-project/ubuntu2404:74
+            compiler: clang@18.1.3
+            default: false
+
+          - image: ghcr.io/acts-project/ubuntu2404_clang19:74
+            compiler: clang@19.1.6
+            default: false
 
     uses: ./.github/workflows/spack.yml
     with:
