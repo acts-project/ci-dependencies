@@ -14,10 +14,9 @@ function set_env {
 
   echo "=> ${key}=${value}"
 
+  export "${key}=${value}"
   if [ -n "${GITHUB_ACTIONS:-}" ]; then
     echo "${key}=${value}" >> "$GITHUB_ENV"
-  else
-    export "${key}=${value}"
   fi
 }
 
