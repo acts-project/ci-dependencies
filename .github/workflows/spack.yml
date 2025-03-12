@@ -27,8 +27,6 @@ jobs:
 
   build:
     runs-on: "${{ inputs.os }}"
-    container:
-      image: ${{ inputs.image == 'none' && '' || inputs.image }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,7 +50,6 @@ jobs:
         if: '${{ inputs.image }} != "none"'
         run:
           docker run -v"$PWD:/src" -w /src ${{ inputs.image }} ./spack_build.sh
-
 
       - name: Run spack build on host
         if: '${{ inputs.image }} == "none"'
