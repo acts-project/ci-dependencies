@@ -80,7 +80,7 @@ jobs:
             -e "COMPILER=${{ inputs.compiler }}" \
             -e "IS_DEFAULT=${{ inputs.default }}" \
             -e "GITHUB_ENV=/github_env" \
-            -e "GITHUB_ACTIONS=${GITHUB_ACTIONS} \
+            -e "GITHUB_ACTIONS=${GITHUB_ACTIONS}" \
             -w /build \
             ${{ inputs.image }} \
             /src/spack_build.sh
