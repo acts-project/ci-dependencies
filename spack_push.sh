@@ -25,4 +25,5 @@ echo "+ Pushing to buildcache"
   buildcache push \
   --base-image "${BASE_IMAGE}" \
   --unsigned \
-  --update-index acts-spack-buildcache
+  --update-index \
+  acts-spack-buildcache
