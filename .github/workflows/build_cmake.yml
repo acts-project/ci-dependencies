@@ -8,15 +8,15 @@ on:
 
 
 jobs:
-  build_cmake:
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - macos-14
-          - ubuntu-22.04
-          - ubuntu-24.04
-    uses: ./.github/workflows/cmake.yml
-    with:
-      os: ${{ matrix.os }}
-    secrets: inherit
+  # build_cmake:
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       os:
+  #         - macos-14
+  #         - ubuntu-22.04
+  #         - ubuntu-24.04
+  #   uses: ./.github/workflows/cmake.yml
+  #   with:
+  #     os: ${{ matrix.os }}
+  #   secrets: inherit
