@@ -46,6 +46,8 @@ jobs:
         with:
           xcode-version: "${{ inputs.xcode }}"
 
+      - run: "echo ${{ inputs.image }}"
+
       - name: Run spack build in container
         if: '${{ inputs.image }} != ""'
         run:
