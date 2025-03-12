@@ -32,6 +32,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Spack
+        uses: spack/setup-spack@v2
+
+      - name: Apply spack patch
+        working-directory: spack
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+
       - name: Setup Xcode version
         if: startsWith(inputs.os, 'macos')
         uses: maxim-lobanov/setup-xcode@v1
@@ -40,13 +50,9 @@ jobs:
 
       - name: Run spack build in container
         if: '${{ inputs.image }} != "none"'
-        uses: docker://${{ inputs.image }}
-        with:
-          args: |
-            pwd
-            whoami
-            ls -al
-            uname -a
+        run:
+          docker run -v"$PWD:/src" -w /src ${{ inputs.image }} ./spack_build.sh
+
 
       - name: Run spack build on host
         if: '${{ inputs.image }} == "none"'
