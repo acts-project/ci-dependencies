@@ -150,6 +150,7 @@ jobs:
             -e "GITHUB_ACTIONS=${GITHUB_ACTIONS}" \
             -e "GH_OCI_USER=${{ github.actor }}" \
             -e "GH_OCI_TOKEN=${{ secrets.GITHUB_TOKEN }}" \
+            -e "BASE_IMAGE=${BASE_IMAGE}" \
             -w /build \
             ${{ inputs.image }} \
             /src/spack_push.sh
