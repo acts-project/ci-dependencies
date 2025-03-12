@@ -68,7 +68,10 @@ jobs:
           export COMPILER=${{ inputs.compiler }}
           export IS_DEFAULT=${{ inputs.default }}
           export SPACK_ROOT=$(spack location -r)
-          ./spack_build.sh
+          mkdir build
+          pushd build
+          ../spack_build.sh
+          popd
 
       #
       # - name: List visible compilers
