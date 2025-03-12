@@ -47,12 +47,12 @@ jobs:
           xcode-version: "${{ inputs.xcode }}"
 
       - name: Run spack build in container
-        if: '${{ inputs.image }} != "none"'
+        if: '${{ inputs.image }} != ""'
         run:
           docker run -v"$PWD:/src" -w /src ${{ inputs.image }} ./spack_build.sh
 
       - name: Run spack build on host
-        if: '${{ inputs.image }} == "none"'
+        if: '${{ inputs.image }} == ""'
         run: |
           pwd
           whoami
