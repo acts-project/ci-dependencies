@@ -147,7 +147,7 @@ jobs:
             -v"$(spack location -r):/spack" \
             -v"$PWD/build:/build" \
             -e "SPACK_ROOT=/spack" \
-            -e "GITHUB_ACTIONS=${GITHUB_ACTIONS} \
+            -e "GITHUB_ACTIONS=${GITHUB_ACTIONS}" \
             -e "GH_OCI_USER=${{ github.actor }}" \
             -e "GH_OCI_TOKEN=${{ secrets.GITHUB_TOKEN }}" \
             -w /build \
