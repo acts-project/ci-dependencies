@@ -52,14 +52,14 @@ jobs:
           which spack
           docker run \
             -v"$PWD:/src" \
-            -v"$(spack location -r):/root/spack" \
-            -w /src ${{ inputs.image }} ./spack_build.sh
+            -v"$(spack location -r):/spack" \
+            -w /src ${{ inputs.image }} ./spack_build.sh /spack
 
       - name: Run spack build on host
         if: "${{ inputs.image == '' }}"
         run: |
           which spack
-          ./spack_build.sh
+          ./spack_build.sh $(spack location -r)
 
       #
       # - name: List visible compilers
