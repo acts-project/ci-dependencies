@@ -30,36 +30,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # - name: Set up Spack
-      #   uses: spack/setup-spack@v2
-      #
-      # - name: Apply spack patch
-      #   working-directory: spack
-      #   run: |
-      #     git config user.name github-actions[bot]
-      #     git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-      #
-      #
-      # - name: Setup Xcode version
-      #   if: startsWith(inputs.os, 'macos')
-      #   uses: maxim-lobanov/setup-xcode@v1
-      #   with:
-      #     xcode-version: "${{ inputs.xcode }}"
+      - name: Set up Spack
+        uses: spack/setup-spack@v2
 
-      - run: "echo IMAGE: '${{ inputs.image }}'"
+      - name: Apply spack patch
+        working-directory: spack
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+
+      - name: Setup Xcode version
+        if: startsWith(inputs.os, 'macos')
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "${{ inputs.xcode }}"
 
       - name: Run spack build in container
         if: "${{ inputs.image != '' }}"
-        run:
-          docker run -v"$PWD:/src" -w /src ${{ inputs.image }} ./spack_build.sh
+        run: |
+          which spack
+          docker run \
+            -v"$PWD:/src" \
+            -v"$HOME/spack:~/spack"
+            -w /src ${{ inputs.image }} ./spack_build.sh
 
       - name: Run spack build on host
         if: "${{ inputs.image == '' }}"
         run: |
-          pwd
-          whoami
-          ls -al
-          uname -a
+          which spack
+          ./spack_build.sh
 
       #
       # - name: List visible compilers

@@ -10,3 +10,7 @@ pwd
 whoami
 ls -al
 uname -a
+
+
+which spack
+spack --version
