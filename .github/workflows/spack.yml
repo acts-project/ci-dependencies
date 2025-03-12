@@ -52,7 +52,7 @@ jobs:
           which spack
           docker run \
             -v"$PWD:/src" \
-            -v"$HOME/spack:~/spack"
+            -v"$HOME/spack:~/spack" \
             -w /src ${{ inputs.image }} ./spack_build.sh
 
       - name: Run spack build on host
