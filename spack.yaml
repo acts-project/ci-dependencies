@@ -42,17 +42,3 @@ spack:
       access_pair:
         id_variable: GH_OCI_USER
         secret_variable: GH_OCI_TOKEN
-  compilers:
-  - compiler:
-      spec: apple-clang@=16.0.0
-      paths:
-        cc: /usr/bin/clang
-        cxx: /usr/bin/clang++
-        f77: null
-        fc: null
-      flags: {}
-      operating_system: sequoia
-      target: aarch64
-      modules: []
-      environment: {}
-      extra_rpaths: []
