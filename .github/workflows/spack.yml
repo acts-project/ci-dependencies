@@ -27,8 +27,6 @@ jobs:
 
   build:
     runs-on: "${{ inputs.os }}"
-    container:
-      image: ${{ inputs.image == 'none' && '' || inputs.image }}
     steps:
       - uses: actions/checkout@v4
 
@@ -40,43 +38,71 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: Remove packages to save disk
+        if: startsWith(inputs.os, 'ubuntu')
+        run: |
+          df -h
+          sudo apt-get update
+          echo "Listing 25 largest packages"
+          dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 25
+          echo "Removing large packages"
+          sudo apt-get remove -y \
+            '^dotnet-.*' \
+            azure-cli \
+            google-cloud-cli \
+            google-chrome-stable \
+            firefox \
+            powershell \
+            mono-devel \
+          '^temurin.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          rm -rf /usr/share/dotnet/
+          df -h
+
       - name: Setup Xcode version
         if: startsWith(inputs.os, 'macos')
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "${{ inputs.xcode }}"
 
-      - name: List visible compilers
+      - name: Run spack build (container)
+        if: "${{ inputs.image != '' }}"
         run: |
-          spack compiler find
-          spack compilers
+          mkdir build
+          docker run \
+            -v"$PWD:/src" \
+            -v"$(spack location -r):/spack" \
+            -v"$PWD/build:/build" \
+            -v "$GITHUB_ENV:/github_env"\
+            -e "SPACK_ROOT=/spack" \
+            -e "COMPILER=${{ inputs.compiler }}" \
+            -e "IS_DEFAULT=${{ inputs.default }}" \
+            -e "GITHUB_ENV=/github_env" \
+            -e "GITHUB_ACTIONS=${GITHUB_ACTIONS}" \
+            -w /build \
+            ${{ inputs.image }} \
+            /src/spack_build.sh
 
-      - name: Locate OpenGL
-        run: ./opengl.sh
-
-
-      - name: Select compiler
-        if: inputs.compiler != ''
+      - name: Run spack build (host)
+        if: "${{ inputs.image == '' }}"
         run: |
-          spack compilers | grep "${{ inputs.compiler }}"
-          spack -e . config add 'packages:all:require: ["%${{ inputs.compiler }}"]'
-
-      - name: Spack concretize
-        run: |
-          spack -e . concretize -Uf
-          spack -e . find
-
+          export COMPILER=${{ inputs.compiler }}
+          export SPACK_ROOT=$(spack location -r)
+          mkdir build
+          pushd build
+          ../spack_build.sh
+          popd
 
       - name: Lockfile bookkeeping
         shell: bash
+        if: always()
         run: |
-          arch=$(spack arch --family)
-          export TARGET_TRIPLET="${arch}_${{ inputs.compiler }}"
-          echo "TARGET_TRIPLET=${TARGET_TRIPLET}" >> "$GITHUB_ENV"
-          cp spack.lock "spack_${TARGET_TRIPLET}.lock"
+          cp build/spack.lock "spack_${TARGET_TRIPLET}.lock"
           if [[ "${{ inputs.default }}" == "true" ]]; then
             # this will be become the default combination for this architecture
-            cp spack.lock "spack_${arch}.lock"
+            cp build/spack.lock "spack_${ARCH}.lock"
           fi
 
       - name: Upload lock files
@@ -88,10 +114,6 @@ jobs:
             spack_*.lock
           if-no-files-found: error
 
-      - name: Spack build
-        run: |
-          spack -e . install --no-check-signature --show-log-on-error
-
       - name: Add lock files to release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
@@ -99,24 +121,119 @@ jobs:
           files: |
             spack_*.lock
 
-      - name: Push packages and update index
-        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !cancelled()
-        env:
-          GH_OCI_USER: "${{ github.actor }}"
-          GH_OCI_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Derive base image
         shell: bash
         run: |
           if [[ "${{ inputs.image }}" != "" ]]; then
-            export BASE_IMAGE="${{ inputs.image }}"
+            echo BASE_IMAGE="${{ inputs.image }}" >> "$GITHUB_ENV"
           elif [[ "${{ inputs.os }}" == "ubuntu-22.04" ]]; then
-            export BASE_IMAGE="ubuntu:22.04"
+            echo BASE_IMAGE="ubuntu:22.04" >> "$GITHUB_ENV"
           elif [[ "${{ inputs.os }}" == "ubuntu-24.04" ]]; then
-            export BASE_IMAGE="ubuntu:24.04"
+            echo BASE_IMAGE="ubuntu:24.04" >> "$GITHUB_ENV"
           else
-            export BASE_IMAGE="ubuntu:24.04"
+            echo BASE_IMAGE="ubuntu:24.04" >> "$GITHUB_ENV"
           fi
-          echo "BASE IMAGE: ${BASE_IMAGE}"
-          ./retry.sh spack -e . buildcache push --base-image "${BASE_IMAGE}" --unsigned --update-index acts-spack-buildcache
 
-      # - uses: mxschmitt/action-tmate@v3
-      #   if: failure()
+      - name: Print base image
+        shell: bash
+        run: |
+          echo "BASE IMAGE: ${BASE_IMAGE}"
+
+      - name: Push spack cache (container)
+        if: inputs.image != '' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !cancelled()
+        run: |
+          docker run \
+            -v"$PWD:/src" \
+            -v"$(spack location -r):/spack" \
+            -v"$PWD/build:/build" \
+            -e "SPACK_ROOT=/spack" \
+            -e "GITHUB_ACTIONS=${GITHUB_ACTIONS} \
+            -e "GH_OCI_USER=${{ github.actor }}" \
+            -e "GH_OCI_TOKEN=${{ secrets.GITHUB_TOKEN }}" \
+            -w /build \
+            ${{ inputs.image }} \
+            /src/spack_push.sh
+
+      - name: Push spack cache (host)
+        if: inputs.image == '' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !cancelled()
+        env:
+          GH_OCI_USER: "${{ github.actor }}"
+          GH_OCI_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        run: |
+          export SPACK_ROOT=$(spack location -r)
+          pushd build
+          ../spack_push.sh
+          popd
+
+      #
+      # - name: List visible compilers
+      #   run: |
+      #     spack compiler find
+      #     spack compilers
+      #
+      # - name: Locate OpenGL
+      #   run: ./opengl.sh
+      #
+      #
+      # - name: Select compiler
+      #   if: inputs.compiler != ''
+      #   run: |
+      #     spack compilers | grep "${{ inputs.compiler }}"
+      #     spack -e . config add 'packages:all:require: ["%${{ inputs.compiler }}"]'
+      #
+      # - name: Spack concretize
+      #   run: |
+      #     spack -e . concretize -Uf
+      #     spack -e . find
+      #
+      # - name: Lockfile bookkeeping
+      #   shell: bash
+      #   run: |
+      #     arch=$(spack arch --family)
+      #     export TARGET_TRIPLET="${arch}_${{ inputs.compiler }}"
+      #     echo "TARGET_TRIPLET=${TARGET_TRIPLET}" >> "$GITHUB_ENV"
+      #     cp spack.lock "spack_${TARGET_TRIPLET}.lock"
+      #     if [[ "${{ inputs.default }}" == "true" ]]; then
+      #       # this will be become the default combination for this architecture
+      #       cp spack.lock "spack_${arch}.lock"
+      #     fi
+
+      # KEEP:
+      # - name: Upload lock files
+      #   uses: actions/upload-artifact@v4
+      #   if: always()
+      #   with:
+      #     name: spack_${{ env.TARGET_TRIPLET }}-locks
+      #     path: |
+      #       spack_*.lock
+      #     if-no-files-found: error
+      #
+      # - name: Spack build
+      #   run: |
+      #     spack -e . install --no-check-signature --show-log-on-error
+      #
+      # - name: Add lock files to release
+      #   uses: softprops/action-gh-release@v2
+      #   if: startsWith(github.ref, 'refs/tags/')
+      #   with:
+      #     files: |
+      #       spack_*.lock
+      #
+      # - name: Push packages and update index
+      #   if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !cancelled()
+      #   env:
+      #     GH_OCI_USER: "${{ github.actor }}"
+      #     GH_OCI_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      #   shell: bash
+      #   run: |
+      #     if [[ "${{ inputs.image }}" != "" ]]; then
+      #       export BASE_IMAGE="${{ inputs.image }}"
+      #     elif [[ "${{ inputs.os }}" == "ubuntu-22.04" ]]; then
+      #       export BASE_IMAGE="ubuntu:22.04"
+      #     elif [[ "${{ inputs.os }}" == "ubuntu-24.04" ]]; then
+      #       export BASE_IMAGE="ubuntu:24.04"
+      #     else
+      #       export BASE_IMAGE="ubuntu:24.04"
+      #     fi
+      #     echo "BASE IMAGE: ${BASE_IMAGE}"
+      #     ./retry.sh spack -e . buildcache push --base-image "${BASE_IMAGE}" --unsigned --update-index acts-spack-buildcache
