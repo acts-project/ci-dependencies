@@ -78,7 +78,6 @@ jobs:
             -v "$GITHUB_ENV:/github_env"\
             -e "SPACK_ROOT=/spack" \
             -e "COMPILER=${{ inputs.compiler }}" \
-            -e "IS_DEFAULT=${{ inputs.default }}" \
             -e "GITHUB_ENV=/github_env" \
             -e "GITHUB_ACTIONS=${GITHUB_ACTIONS}" \
             -w /build \
