@@ -39,6 +39,26 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
 
+      - name: Remove packages to save disk
+        if: startsWith(inputs.os, 'ubuntu')
+        run: |
+          df -h
+          sudo apt-get update
+          echo "Listing 25 largest packages"
+          dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 25
+          echo "Removing large packages"
+          sudo apt-get remove -y '^dotnet-.*' || true
+          sudo apt-get remove -y azure-cli || true
+          sudo apt-get remove -y google-cloud-cli || true
+          sudo apt-get remove -y google-chrome-stable || true
+          sudo apt-get remove -y firefox || true
+          sudo apt-get remove -y powershell || true
+          sudo apt-get remove -y mono-devel || true
+          sudo apt-get remove -y '^temurin.*' || true
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          rm -rf /usr/share/dotnet/
+          df -h
 
       - name: Setup Xcode version
         if: startsWith(inputs.os, 'macos')
@@ -46,9 +66,10 @@ jobs:
         with:
           xcode-version: "${{ inputs.xcode }}"
 
-      - name: Run spack build in container
+      - name: Run spack build (container)
         if: "${{ inputs.image != '' }}"
         run: |
+          mkdir build
           docker run \
             -v"$PWD:/src" \
             -v"$(spack location -r):/spack" \
@@ -58,19 +79,91 @@ jobs:
             -e "COMPILER=${{ inputs.compiler }}" \
             -e "IS_DEFAULT=${{ inputs.default }}" \
             -e "GITHUB_ENV=/github_env" \
+            -e "GITHUB_ACTIONS=${GITHUB_ACTIONS} \
             -w /build \
             ${{ inputs.image }} \
             /src/spack_build.sh
 
-      - name: Run spack build on host
+      - name: Run spack build (host)
         if: "${{ inputs.image == '' }}"
         run: |
           export COMPILER=${{ inputs.compiler }}
-          export IS_DEFAULT=${{ inputs.default }}
           export SPACK_ROOT=$(spack location -r)
           mkdir build
           pushd build
           ../spack_build.sh
+          popd
+
+      - name: Lockfile bookkeeping
+        shell: bash
+        if: always()
+        run: |
+          cp build/spack.lock "spack_${TARGET_TRIPLET}.lock"
+          if [[ "${{ inputs.default }}" == "true" ]]; then
+            # this will be become the default combination for this architecture
+            cp build/spack.lock "spack_${ARCH}.lock"
+          fi
+
+      - name: Upload lock files
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spack_${{ env.TARGET_TRIPLET }}-locks
+          path: |
+            spack_*.lock
+          if-no-files-found: error
+
+      - name: Add lock files to release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            spack_*.lock
+
+      - name: Derive base image
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !cancelled()
+        shell: bash
+        run: |
+          if [[ "${{ inputs.image }}" != "" ]]; then
+            echo BASE_IMAGE="${{ inputs.image }}" >> "$GITHUB_ENV"
+          elif [[ "${{ inputs.os }}" == "ubuntu-22.04" ]]; then
+            echo BASE_IMAGE="ubuntu:22.04" >> "$GITHUB_ENV"
+          elif [[ "${{ inputs.os }}" == "ubuntu-24.04" ]]; then
+            echo BASE_IMAGE="ubuntu:24.04" >> "$GITHUB_ENV"
+          else
+            echo BASE_IMAGE="ubuntu:24.04" >> "$GITHUB_ENV"
+          fi
+
+      - name: Print base image
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !cancelled()
+        shell: bash
+        run: |
+          echo "BASE IMAGE: ${BASE_IMAGE}"
+
+      - name: Push spack cache (container)
+        if: "${{ inputs.image != '' }}"
+        run: |
+          docker run \
+            -v"$PWD:/src" \
+            -v"$(spack location -r):/spack" \
+            -v"$PWD/build:/build" \
+            -e "SPACK_ROOT=/spack" \
+            -e "GITHUB_ACTIONS=${GITHUB_ACTIONS} \
+            -e "GH_OCI_USER=${{ github.actor }}" \
+            -e "GH_OCI_TOKEN=${{ secrets.GITHUB_TOKEN }}" \
+            -w /build \
+            ${{ inputs.image }} \
+            /src/spack_push.sh
+
+      - name: Push spack cache (host)
+        if: "${{ inputs.image == '' }}"
+        env:
+          GH_OCI_USER: "${{ github.actor }}"
+          GH_OCI_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        run: |
+          export SPACK_ROOT=$(spack location -r)
+          pushd build
+          ../spack_push.sh
           popd
 
       #

@@ -30,6 +30,7 @@ function start_section() {
 }
 
 function end_section() {
+  echo "" > /dev/null
     if [ -n "${GITHUB_ACTIONS:-}" ]; then
         echo "::endgroup::"
     fi
@@ -43,11 +44,6 @@ fi
 
 if [ -z "${COMPILER:-}" ]; then
     echo "COMPILER is not set"
-    exit 1
-fi
-
-if [ -z "${IS_DEFAULT:-}" ]; then
-    echo "IS_DEFAULT is not set"
     exit 1
 fi
 
@@ -77,18 +73,9 @@ end_section
 start_section "Concretize"
 spack -e . concretize -Uf
 spack -e . find -c
+set_env ARCH "$(spack arch --family)"
+set_env TARGET_TRIPLET "${ARCH}_${COMPILER}"
 end_section
 
-start_section "Lockfile bookkeeping"
-arch=$(spack arch --family)
-set_env TARGET_TRIPLET "${arch}_${COMPILER}"
-cp spack.lock "spack_${TARGET_TRIPLET}.lock"
-if [[ "${IS_DEFAULT}" == "true" ]]; then
-  # this will be become the default combination for this architecture
-  cp spack.lock "spack_${arch}.lock"
-fi
-end_section
-
-start_section "Spack build"
+echo "+ Spack build"
 spack -e . install --no-check-signature --show-log-on-error
-end_section
