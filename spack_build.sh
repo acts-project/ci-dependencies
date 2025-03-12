@@ -21,6 +21,21 @@ function set_env {
   fi
 }
 
+function start_section() {
+    local section_name="$1"
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then
+        echo "::group::${section_name}"
+    else
+        echo "+ ${section_name}"
+    fi
+}
+
+function end_section() {
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then
+        echo "::endgroup::"
+    fi
+}
+
 
 if [ -z "${SPACK_ROOT:-}" ]; then
     echo "SPACK_ROOT is not set"
@@ -37,32 +52,35 @@ if [ -z "${IS_DEFAULT:-}" ]; then
     exit 1
 fi
 
-echo "+ Setting up spack from $SPACK_ROOT"
+start_section "Setting up spack from $SPACK_ROOT"
 source "$SPACK_ROOT"/share/spack/setup-env.sh
+end_section
 
 
-echo "+ Spack version: $(spack --version)"
+echo "Spack version: $(spack --version)"
 
 
-echo "+ List visible compilers"
-
+start_section "List visible compilers"
 spack compiler find
 spack compilers
+end_section
 
-echo "+ Locate OpenGL"
+start_section "Locate OpenGL"
 "$SCRIPT_DIR"/opengl.sh
+end_section
 
-echo "+ Select compiler"
-
+start_section "Select compiler"
 spack compilers | grep "$COMPILER"
 spack env create -d . "$SCRIPT_DIR"/spack.yaml # !!!! TURN BACK ON
 spack -e . config add "packages:all:require: [\"%$COMPILER\"]"
+end_section
 
-echo "+ Concretize"
+start_section "Concretize"
 spack -e . concretize -Uf
 spack -e . find -c
+end_section
 
-echo "+ Lockfile bookkeeping"
+start_section "Lockfile bookkeeping"
 arch=$(spack arch --family)
 set_env TARGET_TRIPLET "${arch}_${COMPILER}"
 cp spack.lock "spack_${TARGET_TRIPLET}.lock"
@@ -70,6 +88,8 @@ if [[ "${IS_DEFAULT}" == "true" ]]; then
   # this will be become the default combination for this architecture
   cp spack.lock "spack_${arch}.lock"
 fi
+end_section
 
-echo "+ Spack build"
+start_section "Spack build"
 spack -e . install --no-check-signature --show-log-on-error
+end_section
