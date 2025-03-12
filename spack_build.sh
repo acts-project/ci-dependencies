@@ -6,6 +6,8 @@ set -o pipefail
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}"   )" &> /dev/null && pwd   )
 
+export SPACK_COLOR=always
+
 function set_env {
   key="$1"
   value="$2"
