@@ -49,17 +49,26 @@ jobs:
       - name: Run spack build in container
         if: "${{ inputs.image != '' }}"
         run: |
-          which spack
           docker run \
             -v"$PWD:/src" \
             -v"$(spack location -r):/spack" \
-            -w /src ${{ inputs.image }} ./spack_build.sh /spack
+            -v"$PWD/build:/build" \
+            -v "$GITHUB_ENV:/github_env"\
+            -e "SPACK_ROOT=/spack" \
+            -e "COMPILER=${{ inputs.compiler }}" \
+            -e "IS_DEFAULT=${{ inputs.default }}" \
+            -e "GITHUB_ENV=/github_env" \
+            -w /build \
+            ${{ inputs.image }} \
+            ./spack_build.sh
 
       - name: Run spack build on host
         if: "${{ inputs.image == '' }}"
         run: |
-          which spack
-          ./spack_build.sh $(spack location -r)
+          export COMPILER=${{ inputs.compiler }}
+          export IS_DEFAULT=${{ inputs.default }}
+          export SPACK_ROOT=$(spack location -r)
+          ./spack_build.sh
 
       #
       # - name: List visible compilers
