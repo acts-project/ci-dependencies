@@ -101,7 +101,7 @@ jobs:
           cp build/spack.lock "spack_${TARGET_TRIPLET}.lock"
           if [[ "${{ inputs.default }}" == "true" ]]; then
             # this will be become the default combination for this architecture
-            cp build/spack.lock "spack_${ARCH}.lock"
+            cp build/spack.lock "spack_${TARGET_ARCH}.lock"
           fi
 
       - name: Upload lock files

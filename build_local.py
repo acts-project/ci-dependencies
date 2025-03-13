@@ -66,6 +66,7 @@ def run_host(
     subprocess.run(
         [script_dir / cmd],
         env={
+            **os.environ,
             "SPACK_ROOT": spack_root,
             "COMPILER": compiler,
             "GH_OCI_USER": oci_user,

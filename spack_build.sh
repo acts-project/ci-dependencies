@@ -75,9 +75,12 @@ end_section
 start_section "Concretize"
 spack -e . concretize -Uf
 spack -e . find -c
-set_env ARCH "$(spack arch --family)"
-set_env TARGET_TRIPLET "${ARCH}_${COMPILER}"
+set_env TARGET_ARCH "$(spack arch --family)"
+set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}"
 end_section
 
 echo "+ Spack build"
-spack -e . install --no-check-signature --show-log-on-error
+spack -e . install \
+  --no-check-signature \
+  --show-log-on-error \
+  pythia8
