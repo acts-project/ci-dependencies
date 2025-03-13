@@ -122,6 +122,7 @@ jobs:
 
       - name: Derive base image
         shell: bash
+        if: "!cancelled()"
         run: |
           if [[ "${{ inputs.image }}" != "" ]]; then
             echo BASE_IMAGE="${{ inputs.image }}" >> "$GITHUB_ENV"
@@ -135,6 +136,7 @@ jobs:
 
       - name: Print base image
         shell: bash
+        if: "!cancelled()"
         run: |
           echo "BASE IMAGE: ${BASE_IMAGE}"
 
