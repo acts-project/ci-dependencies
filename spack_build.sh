@@ -82,5 +82,4 @@ end_section
 echo "+ Spack build"
 spack -e . install \
   --no-check-signature \
-  --show-log-on-error \
-  pythia8
+  --show-log-on-error
