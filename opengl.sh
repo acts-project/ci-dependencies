@@ -17,6 +17,11 @@ os=$(spack arch --family)
 
 echo "OS: $os"
 
+if [[ "$os" == *dawrin* ]]; then
+  echo "Nothing to do on Darwin"
+  exit 0
+fi
+
 if [[ "$os" == *ubuntu* ]]; then
   ${SUDO} apt-get update
   ${SUDO} apt-get install -y libgl1-mesa-dev

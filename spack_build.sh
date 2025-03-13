@@ -54,10 +54,13 @@ end_section
 
 echo "Spack version: $(spack --version)"
 
+start_section "Create environment"
+spack env create -d . "$SCRIPT_DIR"/spack.yaml 
+end_section
 
 start_section "List visible compilers"
-spack compiler find
-spack compilers
+spack -e . compiler find --scope "env:$PWD"
+spack -e . compilers
 end_section
 
 start_section "Locate OpenGL"
@@ -65,8 +68,7 @@ start_section "Locate OpenGL"
 end_section
 
 start_section "Select compiler"
-spack compilers | grep "$COMPILER"
-spack env create -d . "$SCRIPT_DIR"/spack.yaml # !!!! TURN BACK ON
+spack -e . compilers | grep "$COMPILER"
 spack -e . config add "packages:all:require: [\"%$COMPILER\"]"
 end_section
 
