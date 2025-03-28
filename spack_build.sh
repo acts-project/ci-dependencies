@@ -57,6 +57,8 @@ start_section "Locate OpenGL"
 end_section
 
 start_section "Select compiler"
+spack -e . compilers 
+echo "Looking for compiler: $COMPILER"
 spack -e . compilers | grep "$COMPILER"
 spack -e . config add "packages:all:require: [\"%$COMPILER\"]"
 end_section
