@@ -93,11 +93,11 @@ jobs:
             default: true
 
           - image: ghcr.io/acts-project/ubuntu2404:74
-            compiler: clang@18.1.3
+            compiler: llvm@18.1.3
             default: false
 
           - image: ghcr.io/acts-project/ubuntu2404_clang19:74
-            compiler: clang@19.1.6
+            compiler: llvm@19.1.6
             default: false
 
     uses: ./.github/workflows/spack.yml
