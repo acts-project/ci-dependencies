@@ -8,17 +8,6 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}"   )" &> /dev/null && pwd 
 
 export SPACK_COLOR=always
 
-function set_env {
-  key="$1"
-  value="$2"
-
-  echo "=> ${key}=${value}"
-
-  export "${key}=${value}"
-  if [ -n "${GITHUB_ACTIONS:-}" ]; then
-    echo "${key}=${value}" >> "$GITHUB_ENV"
-  fi
-}
 
 function start_section() {
     local section_name="$1"
@@ -75,11 +64,24 @@ end_section
 start_section "Concretize"
 spack -e . concretize -Uf
 spack -e . find -c
-set_env TARGET_ARCH "$(spack arch --family)"
-set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}"
 end_section
 
 echo "+ Spack build"
 spack -e . install \
   --no-check-signature \
   --show-log-on-error
+
+function set_env {
+  key="$1"
+  value="$2"
+
+  echo "=> ${key}=${value}"
+
+  export "${key}=${value}"
+  if [ -n "${GITHUB_ACTIONS:-}" ]; then
+    echo "${key}=${value}" >> "$GITHUB_ENV"
+  fi
+}
+
+set_env TARGET_ARCH "$(spack arch --family)"
+set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}"
