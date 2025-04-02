@@ -2,3 +2,5 @@ local
 .DS_Store
 spack.lock
 /.env
+/.spack-env
+
