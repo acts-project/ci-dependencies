@@ -41,35 +41,6 @@ jobs:
       default: ${{ matrix.default }}
     secrets: inherit
 
-  # build_native:
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #
-  #        - os: ubuntu-22.04
-  #          compiler: gcc@11.4.0
-  #          default: true
-  #
-  #        - os: ubuntu-22.04
-  #          compiler: clang@14.0.0
-  #          default: false
-  #
-  #        - os: ubuntu-24.04
-  #          compiler: gcc@13.3.0
-  #          default: true
-  #
-  #        - os: ubuntu-24.04
-  #          compiler: clang@18.1.3
-  #          default: false
-  #
-  #   uses: ./.github/workflows/spack.yml
-  #   with:
-  #     os: ${{ matrix.os }}
-  #     compiler: ${{ matrix.compiler }}
-  #     default: ${{ matrix.default }}
-  #   secrets: inherit
-
   build_container:
     strategy:
       fail-fast: false
