@@ -16,7 +16,14 @@ spack:
     - py-pip
     - py-jinja2 # for edm4hep + podio
     - py-pyyaml # for edm4hep + podio
-    - hepmc3@3.3.0
+
+    - hepmc3@3.3.0 +rootio
+    # compression libraries that can be used by hepmc3 if configured
+    - zstd
+    - lz4
+    - zlib-ng
+    - bzip2
+
     - pythia8@8.311
     - geant4@11.1.3 -data
 
