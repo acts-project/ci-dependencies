@@ -14,73 +14,137 @@ from typing import Annotated
 import os
 import shutil
 import enum
+from abc import ABC, abstractmethod
+import contextlib
 
 import typer
 import slugify
+from rich import print
+from rich.rule import Rule
+from rich.live import Live
 
 app = typer.Typer()
 
 
-def run_container(
-    cmd: str,
-    script_dir: Path,
-    spack_root: Path,
-    build_dir: Path,
-    image: str,
-    compiler: str,
-):
+class Environment(ABC):
+    base_dir: Path
+    script_dir: Path
+    spack_root: Path
+    build_dir: Path
+    compiler: str
+    image: str
 
-    oci_user = os.environ["GH_OCI_USER"]
-    oci_token = os.environ["GH_OCI_TOKEN"]
+    def __init__(
+        self,
+        base_dir: Path,
+        script_dir: Path,
+        spack_root: Path,
+        build_dir: Path,
+        compiler: str,
+        image: str,
+    ):
+        self.base_dir = base_dir
+        self.script_dir = script_dir
+        self.spack_root = spack_root
+        self.build_dir = build_dir
+        self.compiler = compiler
+        self.image = image
 
-    args = [
-        "docker",
-        "run",
-        f"-v{script_dir}:/src",
-        f"-v{spack_root}:/spack",
-        f"-v{build_dir}:/build",
-        "-eSPACK_ROOT=/spack",
-        f"-eCOMPILER={compiler}",
-        f"-eGH_OCI_USER={oci_user}",
-        f"-eGH_OCI_TOKEN={oci_token}",
-        f"-eBASE_IMAGE={image}",
-        "-w/build",
-        image,
-        f"/src/{cmd}",
-    ]
+    @abstractmethod
+    def run_script(self, cmd: str): ...
 
-    subprocess.run(args, check=True)
+    @property
+    def oci_user(self):
+        return os.environ["GH_OCI_USER"]
+
+    @property
+    def oci_token(self):
+        return os.environ["GH_OCI_TOKEN"]
+
+    @abstractmethod
+    def rmbuild(self): ...
+
+    @abstractmethod
+    def rmspack(self): ...
 
 
-def run_host(
-    cmd: str,
-    script_dir: Path,
-    spack_root: Path,
-    build_dir: Path,
-    image: str,
-    compiler: str,
-):
-    oci_user = os.environ["GH_OCI_USER"]
-    oci_token = os.environ["GH_OCI_TOKEN"]
+class HostEnvironment(Environment):
+    def run_script(self, cmd: str):
+        subprocess.run(
+            [self.script_dir / cmd],
+            env={
+                **os.environ,
+                "SPACK_ROOT": self.spack_root,
+                "COMPILER": self.compiler,
+                "GH_OCI_USER": self.oci_user,
+                "GH_OCI_TOKEN": self.oci_token,
+                "BASE_IMAGE": self.image,
+            },
+            cwd=self.build_dir,
+            check=True,
+        )
 
-    subprocess.run(
-        [script_dir / cmd],
-        env={
-            **os.environ,
-            "SPACK_ROOT": spack_root,
-            "COMPILER": compiler,
-            "GH_OCI_USER": oci_user,
-            "GH_OCI_TOKEN": oci_token,
-            "BASE_IMAGE": image,
-        },
-        cwd=build_dir,
-        check=True,
-    )
+    def rmbuild(self):
+        shutil.rmtree(self.build_dir)
+
+    def rmspack(self):
+        shutil.rmtree(self.spack_root)
+
+
+class ContainerEnvironment(Environment):
+
+    def run_script(self, cmd: str):
+        args = [
+            "docker",
+            "run",
+            f"-v{self.script_dir}:/src",
+            f"-v{self.spack_root}:/spack",
+            f"-v{self.build_dir}:/build",
+            "-eSPACK_ROOT=/spack",
+            f"-eCOMPILER={self.compiler}",
+            f"-eGH_OCI_USER={self.oci_user}",
+            f"-eGH_OCI_TOKEN={self.oci_token}",
+            f"-eBASE_IMAGE={self.image}",
+            "-w/build",
+            self.image,
+            f"/src/{cmd}",
+        ]
+
+        subprocess.run(args, check=True)
+
+    def rmbuild(self):
+        rel_build = self.build_dir.relative_to(self.base_dir)
+        container_build = Path("/base") / rel_build
+        args = [
+            "docker",
+            "run",
+            f"-v{self.base_dir}:/base",
+            self.image,
+        ] + ["rm", "-rf", str(container_build)]
+        subprocess.run(args, check=True)
+
+    def rmspack(self):
+        rel_spack = self.spack_root.relative_to(self.base_dir)
+        container_spack = Path("/base") / rel_spack
+        args = [
+            "docker",
+            "run",
+            f"-v{self.base_dir}:/base",
+            self.image,
+        ] + ["rm", "-rf", str(container_spack)]
+        subprocess.run(args, check=True)
 
 
 class Mode(enum.StrEnum):
     host = "host"
     container = "container"
+
+
+@contextlib.contextmanager
+def checkpoint(label: str):
+    print(Rule(f":hourglass_not_done: {label}", align="left"))
+    yield
+    print(Rule(f":white_check_mark: {label}", align="left"))
 
 
 @app.command()
@@ -93,63 +157,77 @@ def main(
     build: bool = True,
     push: bool = True,
     mode: Annotated[Mode, typer.Option()] = Mode.container,
+    spack_version: str = "develop",
+    reinstall_spack: bool = False,
 ):
+
+    script_dir = Path(__file__).resolve().parent
 
     base_dir = base_dir / slugify.slugify(f"{image}-{compiler}")
     base_dir = base_dir.resolve()
 
+    # Always created on host!
     if not base_dir.exists():
         base_dir.mkdir(parents=True)
 
     spack_root = base_dir / "spack"
     build_dir = base_dir / "build"
 
+    if mode == Mode.container:
+        env_type = ContainerEnvironment
+    else:
+        env_type = HostEnvironment
+
+    env = env_type(
+        base_dir=base_dir,
+        script_dir=script_dir,
+        spack_root=spack_root,
+        build_dir=build_dir,
+        compiler=compiler,
+        image=image,
+    )
+
     if build_dir.exists():
         if force:
-            shutil.rmtree(build_dir)
+            env.rmbuild()
         elif ignore:
             pass
         else:
             raise typer.Exit(f"Build directory {build_dir} already exists")
     build_dir.mkdir(parents=True, exist_ok=True)
 
+    if reinstall_spack:
+        with checkpoint("Removing spack"):
+            env.rmspack()
     if not spack_root.exists():
-        subprocess.run(
-            [
-                "git",
-                "clone",
-                "--depth=2",
-                "https://github.com/spack/spack.git",
-                spack_root,
-            ],
-            check=True,
-        )
+        with checkpoint("Installing spack"):
+            subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "https://github.com/spack/spack.git",
+                    spack_root,
+                ],
+                check=True,
+            )
 
-    script_dir = Path(__file__).resolve().parent
-
-    if mode == Mode.container:
-        run_func = run_container
-    else:
-        run_func = run_host
+            subprocess.run(
+                [
+                    "git",
+                    "checkout",
+                    spack_version,
+                ],
+                cwd=spack_root,
+                check=True,
+            )
+        print(f"Spack is at: [bold]{spack_version}[/bold]")
 
     if build:
-        run_func(
-            "spack_build.sh",
-            script_dir=script_dir,
-            spack_root=spack_root,
-            build_dir=build_dir,
-            image=image,
-            compiler=compiler,
-        )
+        with checkpoint("Running spack build"):
+            env.run_script("spack_build.sh")
     if push:
-        run_func(
-            "spack_push.sh",
-            script_dir=script_dir,
-            spack_root=spack_root,
-            build_dir=build_dir,
-            image=image,
-            compiler=compiler,
-        )
+        with checkpoint("Pushing build caches"):
+            env.run_script("spack_push.sh")
 
 
 app()
