@@ -26,6 +26,7 @@ spack:
 
     - pythia8@8.311
     - geant4@11.1.3 -data
+    - fastjet plugins=cxx
 
   packages:
     all:
