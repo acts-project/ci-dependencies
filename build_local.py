@@ -16,14 +16,24 @@ import shutil
 import enum
 from abc import ABC, abstractmethod
 import contextlib
+import logging
 
 import typer
 import slugify
 from rich import print
 from rich.rule import Rule
 from rich.live import Live
+from rich.logging import RichHandler
 
 app = typer.Typer()
+
+
+FORMAT = "%(message)s"
+logging.basicConfig(
+    level="NOTSET", format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+)
+
+log = logging.getLogger("rich")
 
 
 class Environment(ABC):
@@ -54,12 +64,16 @@ class Environment(ABC):
     def run_script(self, cmd: str): ...
 
     @property
-    def oci_user(self):
-        return os.environ["GH_OCI_USER"]
+    def oci_user(self) -> str | None:
+        return os.environ.get("GH_OCI_USER")
 
     @property
-    def oci_token(self):
-        return os.environ["GH_OCI_TOKEN"]
+    def oci_token(self) -> str | None:
+        return os.environ.get("GH_OCI_TOKEN")
+
+    @property
+    def oci_configured(self) -> bool:
+        return self.oci_token is not None and self.oci_user is not None
 
     @abstractmethod
     def rmbuild(self): ...
@@ -70,16 +84,23 @@ class Environment(ABC):
 
 class HostEnvironment(Environment):
     def run_script(self, cmd: str):
+        env = {
+            **os.environ,
+            "SPACK_ROOT": self.spack_root,
+            "COMPILER": self.compiler,
+            "BASE_IMAGE": self.image,
+        }
+
+        if self.oci_configured:
+            env.update(
+                {
+                    "GH_OCI_USER": self.oci_user,
+                    "GH_OCI_TOKEN": self.oci_token,
+                }
+            )
         subprocess.run(
             [self.script_dir / cmd],
-            env={
-                **os.environ,
-                "SPACK_ROOT": self.spack_root,
-                "COMPILER": self.compiler,
-                "GH_OCI_USER": self.oci_user,
-                "GH_OCI_TOKEN": self.oci_token,
-                "BASE_IMAGE": self.image,
-            },
+            env=env,
             cwd=self.build_dir,
             check=True,
         )
@@ -102,8 +123,13 @@ class ContainerEnvironment(Environment):
             f"-v{self.build_dir}:/build",
             "-eSPACK_ROOT=/spack",
             f"-eCOMPILER={self.compiler}",
-            f"-eGH_OCI_USER={self.oci_user}",
-            f"-eGH_OCI_TOKEN={self.oci_token}",
+        ]
+        if self.oci_configured:
+            args += [
+                f"-eGH_OCI_USER={self.oci_user}",
+                f"-eGH_OCI_TOKEN={self.oci_token}",
+            ]
+        args += [
             f"-eBASE_IMAGE={self.image}",
             "-w/build",
             self.image,
@@ -193,7 +219,8 @@ def main(
         elif ignore:
             pass
         else:
-            raise typer.Exit(f"Build directory {build_dir} already exists")
+            raise RuntimeError(f"Build directory {build_dir} already exists")
+
     build_dir.mkdir(parents=True, exist_ok=True)
 
     if reinstall_spack:
@@ -226,8 +253,11 @@ def main(
         with checkpoint("Running spack build"):
             env.run_script("spack_build.sh")
     if push:
-        with checkpoint("Pushing build caches"):
-            env.run_script("spack_push.sh")
+        if not env.oci_configured:
+            log.warning("OCI environment variables not configured, skipping push")
+        else:
+            with checkpoint("Pushing build caches"):
+                env.run_script("spack_push.sh")
 
 
 app()
