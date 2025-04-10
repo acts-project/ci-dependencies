@@ -55,10 +55,6 @@ jobs:
             compiler: gcc@11.4.0
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2204:74
-            compiler: llvm@14.0.0
-            default: false
-
           - image: ghcr.io/acts-project/ubuntu2404:74
             compiler: gcc@13.3.0
             default: true
