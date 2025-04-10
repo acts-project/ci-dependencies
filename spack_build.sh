@@ -69,9 +69,11 @@ spack -e . find -c
 end_section
 
 echo "+ Spack build"
-spack -e . install \
-  --no-check-signature \
-  --show-log-on-error
+args="--no-check-signature --show-log-on-error"
+if [ -n "${FAIL_FAST:-}" ]; then
+  args="$args --fail-fast"
+fi
+spack -e . install $args
 
 function set_env {
   key="$1"

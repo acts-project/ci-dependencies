@@ -5,12 +5,14 @@
 #   "rich",
 #   "typer",
 #   "python-slugify",
+#   "docker",
+#   "httpx",
 # ]
 # ///
 
 import subprocess
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 import os
 import shutil
 import enum
@@ -20,20 +22,25 @@ import logging
 
 import typer
 import slugify
-from rich import print
+from rich.console import Console
 from rich.rule import Rule
 from rich.live import Live
 from rich.logging import RichHandler
+import httpx
 
 app = typer.Typer()
 
 
 FORMAT = "%(message)s"
 logging.basicConfig(
-    level="NOTSET", format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+    level="INFO",
+    format=FORMAT,
+    datefmt="[%X]",
 )
 
-log = logging.getLogger("rich")
+log = logging.getLogger(__name__)
+log.handlers.append(RichHandler(markup=True))
+log.propagate = False
 
 
 class Environment(ABC):
@@ -43,6 +50,7 @@ class Environment(ABC):
     build_dir: Path
     compiler: str
     image: str
+    fail_fast: bool
 
     def __init__(
         self,
@@ -52,6 +60,7 @@ class Environment(ABC):
         build_dir: Path,
         compiler: str,
         image: str,
+        fail_fast: bool,
     ):
         self.base_dir = base_dir
         self.script_dir = script_dir
@@ -59,9 +68,10 @@ class Environment(ABC):
         self.build_dir = build_dir
         self.compiler = compiler
         self.image = image
+        self.fail_fast = fail_fast
 
     @abstractmethod
-    def run_script(self, cmd: str): ...
+    def run_script(self, cmd: str, console: Console): ...
 
     @property
     def oci_user(self) -> str | None:
@@ -83,13 +93,16 @@ class Environment(ABC):
 
 
 class HostEnvironment(Environment):
-    def run_script(self, cmd: str):
+    def run_script(self, cmd: str, console: Console):
         env = {
             **os.environ,
             "SPACK_ROOT": self.spack_root,
             "COMPILER": self.compiler,
             "BASE_IMAGE": self.image,
         }
+
+        if self.fail_fast:
+            env["FAIL_FAST"] = "1"
 
         if self.oci_configured:
             env.update(
@@ -98,12 +111,35 @@ class HostEnvironment(Environment):
                     "GH_OCI_TOKEN": self.oci_token,
                 }
             )
-        subprocess.run(
+        # subprocess.run(
+        #     [self.script_dir / cmd],
+        #     env=env,
+        #     cwd=self.build_dir,
+        #     check=True,
+        # )
+
+        proc = subprocess.Popen(
             [self.script_dir / cmd],
             env=env,
             cwd=self.build_dir,
-            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
         )
+
+        try:
+            assert proc.stdout is not None, "no stdout"
+            while line := proc.stdout.readline() or proc.poll() is None:
+                if isinstance(line, bytes):
+                    line = line.decode("utf-8")
+                    console.print(
+                        line, end="\n", highlight=False, markup=False, emoji=False
+                    )
+        except KeyboardInterrupt:
+            proc.kill()
+            proc.terminate()
+            log.debug("Waiting to terminate")
+            proc.wait()
+            raise
 
     def rmbuild(self):
         shutil.rmtree(self.build_dir)
@@ -113,30 +149,58 @@ class HostEnvironment(Environment):
 
 
 class ContainerEnvironment(Environment):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        import docker
 
-    def run_script(self, cmd: str):
-        args = [
-            "docker",
-            "run",
-            f"-v{self.script_dir}:/src",
-            f"-v{self.spack_root}:/spack",
-            f"-v{self.build_dir}:/build",
-            "-eSPACK_ROOT=/spack",
-            f"-eCOMPILER={self.compiler}",
-        ]
+        self.client = docker.from_env()
+
+    def run_script(self, cmd: str, console: Console):
+        env = {
+            "SPACK_ROOT": "/spack",
+            "COMPILER": self.compiler,
+            "BASE_IMAGE": self.image,
+        }
+
+        if self.fail_fast:
+            env["FAIL_FAST"] = "1"
+
         if self.oci_configured:
-            args += [
-                f"-eGH_OCI_USER={self.oci_user}",
-                f"-eGH_OCI_TOKEN={self.oci_token}",
-            ]
-        args += [
-            f"-eBASE_IMAGE={self.image}",
-            "-w/build",
+            assert self.oci_user is not None
+            assert self.oci_token is not None
+            env.update(
+                {
+                    "GH_OCI_USER": self.oci_user,
+                    "GH_OCI_TOKEN": self.oci_token,
+                }
+            )
+
+        container = self.client.containers.run(
             self.image,
             f"/src/{cmd}",
-        ]
+            environment=env,
+            volumes=[
+                f"{self.script_dir}:/src",
+                f"{self.spack_root}:/spack",
+                f"{self.build_dir}:/build",
+            ],
+            working_dir="/build",
+            detach=True,
+        )
 
-        subprocess.run(args, check=True)
+        try:
+            for s in container.logs(stream=True):
+                s = s.decode("utf-8")
+                console.print(s, end="", highlight=False, markup=False, emoji=False)
+
+            res = container.wait()
+            ec = res["StatusCode"]
+            if ec != 0:
+                log.error("Container execution failed")
+                raise RuntimeError()
+        except KeyboardInterrupt:
+            container.kill()
+            raise
 
     def rmbuild(self):
         rel_build = self.build_dir.relative_to(self.base_dir)
@@ -168,9 +232,15 @@ class Mode(enum.StrEnum):
 
 @contextlib.contextmanager
 def checkpoint(label: str):
-    print(Rule(f":hourglass_not_done: {label}", align="left"))
-    yield
-    print(Rule(f":white_check_mark: {label}", align="left"))
+    log.info(":hourglass_not_done: Starting: %s", label)
+    try:
+        yield
+        log.info(":white_check_mark: Finished: %s", label)
+    except KeyboardInterrupt:
+        raise
+    except:
+        log.error(":red_square: Failed: %s", label)
+        raise
 
 
 @app.command()
@@ -185,7 +255,11 @@ def main(
     mode: Annotated[Mode, typer.Option()] = Mode.container,
     spack_version: str = "develop",
     reinstall_spack: bool = False,
+    fail_fast: bool = False,
+    spack_patches: list[str] = [],
 ):
+
+    console = Console()
 
     script_dir = Path(__file__).resolve().parent
 
@@ -211,6 +285,7 @@ def main(
         build_dir=build_dir,
         compiler=compiler,
         image=image,
+        fail_fast=fail_fast,
     )
 
     if build_dir.exists():
@@ -247,17 +322,40 @@ def main(
                 cwd=spack_root,
                 check=True,
             )
-        print(f"Spack is at: [bold]{spack_version}[/bold]")
 
-    if build:
-        with checkpoint("Running spack build"):
-            env.run_script("spack_build.sh")
-    if push:
-        if not env.oci_configured:
-            log.warning("OCI environment variables not configured, skipping push")
-        else:
-            with checkpoint("Pushing build caches"):
-                env.run_script("spack_push.sh")
+            for patch in spack_patches:
+                if os.path.exists(patch):
+                    with open(patch, "rb") as fh:
+                        content = fh.read()
+                else:
+                    res = httpx.get(patch)
+                    res.raise_for_status()
+                    content = res.content
+                subprocess.run(
+                    [
+                        "git",
+                        "am",
+                    ],
+                    input=content,
+                    cwd=spack_root,
+                    check=True,
+                )
+
+        log.info(f"Spack is at: [bold]{spack_version}[/bold]")
+
+    try:
+        if build:
+            with checkpoint("Running spack build"):
+                env.run_script("spack_build.sh", console)
+        if push:
+            if not env.oci_configured:
+                log.warning("OCI environment variables not configured, skipping push")
+            else:
+                with checkpoint("Pushing build caches"):
+                    env.run_script("spack_push.sh", console)
+    except Exception:
+        log.error("Terminating build due to error")
+        return typer.Exit(1)
 
 
 app()
