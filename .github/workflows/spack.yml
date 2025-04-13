@@ -50,10 +50,10 @@ jobs:
           sudo apt-get remove -y \
             '^dotnet-.*' \
             azure-cli \
-            google-cloud-cli \
-            google-chrome-stable \
+            '^google-cloud-cli$' \
+            '^google-chrome-stable$' \
             firefox \
-            powershell \
+            '^powershell$' \
             mono-devel \
           '^temurin.*'
           sudo apt-get autoremove -y
