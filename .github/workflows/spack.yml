@@ -47,20 +47,8 @@ jobs:
           echo "Listing 25 largest packages"
           dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 25
           echo "Removing large packages"
-          sudo apt-get remove -y \
-            '^dotnet-.*' \
-            azure-cli \
-            '^google-cloud-cli$' \
-            '^google-chrome-stable$' \
-            firefox \
-            '^powershell$' \
-            mono-devel \
-          '^temurin.*'
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-          rm -rf /usr/share/dotnet/
+          ./uninstall_packages.sh
           df -h
-
       - name: Setup Xcode version
         if: startsWith(inputs.os, 'macos')
         uses: maxim-lobanov/setup-xcode@v1
