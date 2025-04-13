@@ -18,7 +18,7 @@ import json
 from jinja2 import Template
 from typing import Annotated
 
-DOCKERFILE_TEMPLATE = """
+DOCKERFILE_TEMPLATE = r"""
 # Load root specs as builders
 {% for name, full_name, url in layers -%}
 FROM {{ url }} AS {{ name }}
@@ -31,24 +31,47 @@ FROM {{ base_image }}
 COPY --from={{ name }} /spack /spack
 {% endfor %}
 
-RUN {% for name, full_name, url in layers -%}
-    {% if loop.first %}dir=`find /spack -type d -name "{{ full_name }}*"` \\
-    && echo "export CMAKE_PREFIX_PATH=$dir" >> $HOME/.bashrc \\
-    {% else %}&& dir=`find /spack -type d -name "{{ full_name }}*"` \\
-    && echo "export CMAKE_PREFIX_PATH=\$CMAKE_PREFIX_PATH:$dir" >> $HOME/.bashrc{% if not loop.last %} \\{% endif %}
-    {% endif %}
-{%- endfor %}
-
-RUN cat $HOME/.bashrc
-
-RUN cmake_exe=`find /spack -type f -name cmake -executable` \\
-    && cmake_bin_dir=`dirname $cmake_exe` \\
-    && echo "export PATH=$cmake_bin_dir:\$PATH" >> $HOME/.bashrc
-
 RUN <<EOT bash
 set -eux
 {{ preparation_script }}
 EOT
+
+RUN curl -LsSf https://astral.sh/uv/0.6.14/install.sh | sh
+ENV PATH=/root/.local/bin:$PATH
+
+RUN <<EOT bash
+set -eux
+set -o pipefail
+
+# locating package install pathsx
+{%- for name, full_name, url in layers %}
+dir=`find /spack -type d -name "{{ full_name }}*"`
+{%- if loop.first %}
+echo "export CMAKE_PREFIX_PATH=\$dir" >> \$HOME/.bashrc
+{%- else %}
+echo "export CMAKE_PREFIX_PATH=\$dir:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
+{%- endif -%}
+{%- endfor %}
+
+# CLHEP has a special location
+clhep_dir=$(dirname $(find /spack -type f -name "CLHEPConfig.cmake"))
+echo "export CMAKE_PREFIX_PATH=\$clhep_dir:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
+
+cmake_bin_dir=$(dirname $(find /spack -type f -name cmake -executable))
+echo "export PATH=\$cmake_bin_dir:"'\$PATH' >> \$HOME/.bashrc
+
+python_bin_dir=$(find /spack -type d -name "python-3*")/bin
+echo "export PATH=\$python_bin_dir:"'\$PATH' >> \$HOME/.bashrc
+
+echo "source /.venv/bin/activate" >> \$HOME/.bashrc
+
+uv venv --python=\$python_bin_dir/python3
+uv pip install pyyaml jinja2
+
+EOT
+
+
+
 
 ENTRYPOINT ["/bin/bash"]
 
@@ -56,6 +79,19 @@ ENTRYPOINT ["/bin/bash"]
 
 app = typer.Typer()
 console = Console()
+
+# RUN cmake_exe=`find /spack -type f -name cmake -executable` \\
+#     && cmake_bin_dir=`dirname $cmake_exe` \\
+#     && echo "export PATH=$cmake_bin_dir:\$PATH" >> $HOME/.bashrc
+
+
+# RUN {% for name, full_name, url in layers -%}
+#     {% if loop.first %}dir=`find /spack -type d -name "{{ full_name }}*"` \\
+#     && echo "export CMAKE_PREFIX_PATH=$dir" >> $HOME/.bashrc \\
+#     {% else %}&& dir=`find /spack -type d -name "{{ full_name }}*"` \\
+#     && echo "export CMAKE_PREFIX_PATH=\$CMAKE_PREFIX_PATH:$dir" >> $HOME/.bashrc{% if not loop.last %} \\{% endif %}
+#     {% endif %}
+# {%- endfor %}
 
 
 @app.command()
