@@ -57,25 +57,28 @@ EOT
 
 RUN cat <<EOF >> ~/.bashrc
 
-{%- for name, full_name, url in layers %}
-{%- if loop.first %}
-export CMAKE_PREFIX_PATH=\$BASE_DIR/{{ full_name }}
-{%- else %}
-export CMAKE_PREFIX_PATH=\$BASE_DIR/{{ full_name }}:\$CMAKE_PREFIX_PATH
-{%- endif -%}
+declare -a prefixes=(
+{%- for _, spec in specs.items() -%}
+{%- if (loop.index-1) % 3 == 0 %}
+ {% endif %} {{ spec.name }}-{{ spec.version }}-{{ spec.hash }}
 {%- endfor %}
+)
 
-{% set vdt = specs["vdt"] -%}
-export CMAKE_PREFIX_PATH=\$BASE_DIR/{{ vdt.name }}-{{ vdt.version }}-{{ vdt.hash }}:\$CMAKE_PREFIX_PATH
+# Configure \$CMAKE_PREFIX_PATH
+for p in "\${prefixes[@]}"; do
+    CMAKE_PREFIX_PATH="\$BASE_DIR/\$p\${CMAKE_PREFIX_PATH:+:\${CMAKE_PREFIX_PATH}}"
+done
+export CMAKE_PREFIX_PATH
 
 # CLHEP has a special location
 {% set clhep = specs["clhep"] -%}
 export CMAKE_PREFIX_PATH=\$BASE_DIR/{{ clhep.name }}-{{ clhep.version }}-{{ clhep.hash }}/lib/CLHEP-{{ clhep.version }}:\$CMAKE_PREFIX_PATH
 
 # Configure \$PATH Variable
-{% for _, spec in specs.items() %}
-export PATH=\$BASE_DIR/{{ spec.name }}-{{ spec.version }}-{{ spec.hash }}/bin:\$PATH
-{%- endfor %}
+for p in "\${prefixes[@]}"; do
+    PATH="\$BASE_DIR/\$p/bin\${PATH:+:\${PATH}}"
+done
+export PATH
 
 cat /etc/motd
 
@@ -88,9 +91,13 @@ RUN cat <<EOF >> /etc/motd
 - Clone repository: 
     git clone https://github.com/acts-project/acts.git
 - Configure: 
-    cmake -S acts -B build --preset dev
+    cmake -S acts -B build -GNinja --preset dev \\
+      -DACTS_BUILD_UNITTESTS=OFF -DACTS_BUILD_INTEGRATIONTESTS=OFF
 - Build:
     cmake --build build
+- Run:
+    source build/this_acts_withdeps.sh
+    acts/Examples/Scripts/Python/full_chain_odd.py -n1
 ========================================================================
 EOF
 

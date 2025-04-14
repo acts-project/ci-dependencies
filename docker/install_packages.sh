@@ -5,7 +5,5 @@ if [ -f /etc/os-release ]; then
     apt-get install -y \
       ninja-build \
       ccache
-
-      # libvdt-dev \
     fi
 fi
