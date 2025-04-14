@@ -43,36 +43,56 @@ set -o pipefail
 
 base_dir=$(dirname $(find /spack -type d -name "root-*"))
 
-# locating package install paths
-{%- for name, full_name, url in layers %}
-{%- if loop.first %}
-echo "export CMAKE_PREFIX_PATH=\$base_dir/{{ full_name }}" >> \$HOME/.bashrc
-{%- else %}
-echo "export CMAKE_PREFIX_PATH=\$base_dir/{{ full_name }}:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
-{%- endif -%}
-{%- endfor %}
-
-{% set vdt = specs["vdt"] -%}
-echo "export CMAKE_PREFIX_PATH=\$base_dir/{{ vdt.name }}-{{ vdt.version }}-{{ vdt.hash }}:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
-
-# CLHEP has a special location
-{% set clhep = specs["clhep"] -%}
-echo "export CMAKE_PREFIX_PATH=\$base_dir/{{ clhep.name }}-{{ clhep.version }}-{{ clhep.hash }}/lib/CLHEP-{{ clhep.version }}:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
-
-echo "export PATH=
-{%- for _, spec in specs.items() -%}
-\$base_dir/{{ spec.name }}-{{ spec.version }}-{{ spec.hash }}/bin:
-{%- endfor -%}
-:\$PATH" >> \$HOME/.bashrc
+echo "BASE_DIR=\$base_dir" >> ~/.bashrc
 
 {% set python = specs["python"] -%}
 {% set python_exe = "\\$base_dir/"+python.name+"-"+python.version+"-"+python.hash+"/bin/python3" -%}
 uv pip install --python={{ python_exe }} --system pyyaml jinja2
 
+{% set geant4 = specs["geant4"] -%}
+{% set geant4_dir = "\\$base_dir/"+geant4.name+"-"+geant4.version+"-"+geant4.hash+"/share/Geant4/data" -%}
+ln -s {{ geant4_dir }} /g4data
+
 EOT
 
+RUN cat <<EOF >> ~/.bashrc
+
+{%- for name, full_name, url in layers %}
+{%- if loop.first %}
+export CMAKE_PREFIX_PATH=\$BASE_DIR/{{ full_name }}
+{%- else %}
+export CMAKE_PREFIX_PATH=\$BASE_DIR/{{ full_name }}:\$CMAKE_PREFIX_PATH
+{%- endif -%}
+{%- endfor %}
+
+{% set vdt = specs["vdt"] -%}
+export CMAKE_PREFIX_PATH=\$BASE_DIR/{{ vdt.name }}-{{ vdt.version }}-{{ vdt.hash }}:\$CMAKE_PREFIX_PATH
+
+# CLHEP has a special location
+{% set clhep = specs["clhep"] -%}
+export CMAKE_PREFIX_PATH=\$BASE_DIR/{{ clhep.name }}-{{ clhep.version }}-{{ clhep.hash }}/lib/CLHEP-{{ clhep.version }}:\$CMAKE_PREFIX_PATH
+
+# Configure \$PATH Variable
+{% for _, spec in specs.items() %}
+export PATH=\$BASE_DIR/{{ spec.name }}-{{ spec.version }}-{{ spec.hash }}/bin:\$PATH
+{%- endfor %}
+
+cat /etc/motd
+
+EOF
 
 
+
+RUN cat <<EOF >> /etc/motd
+=============== ACTS development image with dependencies ===============
+- Clone repository: 
+    git clone https://github.com/acts-project/acts.git
+- Configure: 
+    cmake -S acts -B build --preset dev
+- Build:
+    cmake --build build
+========================================================================
+EOF
 
 ENTRYPOINT ["/bin/bash"]
 
