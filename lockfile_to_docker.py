@@ -35,34 +35,39 @@ EOT
 RUN curl -LsSf https://astral.sh/uv/0.6.14/install.sh | sh
 ENV PATH=/root/.local/bin:$PATH
 
+ENV CCACHE_DIR=/ccache
+
 RUN <<EOT bash
 set -eux
 set -o pipefail
 
-# locating package install pathsx
+base_dir=$(dirname $(find /spack -type d -name "root-*"))
+
+# locating package install paths
 {%- for name, full_name, url in layers %}
-dir=`find /spack -type d -name "{{ full_name }}*"`
 {%- if loop.first %}
-echo "export CMAKE_PREFIX_PATH=\$dir" >> \$HOME/.bashrc
+echo "export CMAKE_PREFIX_PATH=\$base_dir/{{ full_name }}" >> \$HOME/.bashrc
 {%- else %}
-echo "export CMAKE_PREFIX_PATH=\$dir:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
+echo "export CMAKE_PREFIX_PATH=\$base_dir/{{ full_name }}:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
 {%- endif -%}
 {%- endfor %}
 
-dir=`find /spack -type d -name "vdt-*"`
-echo "export CMAKE_PREFIX_PATH=\$dir:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
+{% set vdt = specs["vdt"] -%}
+echo "export CMAKE_PREFIX_PATH=\$base_dir/{{ vdt.name }}-{{ vdt.version }}-{{ vdt.hash }}:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
 
 # CLHEP has a special location
-clhep_dir=$(dirname $(find /spack -type f -name "CLHEPConfig.cmake"))
-echo "export CMAKE_PREFIX_PATH=\$clhep_dir:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
+{% set clhep = specs["clhep"] -%}
+echo "export CMAKE_PREFIX_PATH=\$base_dir/{{ clhep.name }}-{{ clhep.version }}-{{ clhep.hash }}/lib/CLHEP-{{ clhep.version }}:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
 
-cmake_bin_dir=$(dirname $(find /spack -type f -name cmake -executable))
-echo "export PATH=\$cmake_bin_dir:"'\$PATH' >> \$HOME/.bashrc
+echo "export PATH=
+{%- for _, spec in specs.items() -%}
+\$base_dir/{{ spec.name }}-{{ spec.version }}-{{ spec.hash }}/bin:
+{%- endfor -%}
+:\$PATH" >> \$HOME/.bashrc
 
-python_bin_dir=$(find /spack -type d -name "python-3*")/bin
-echo "export PATH=\$python_bin_dir:"'\$PATH' >> \$HOME/.bashrc
-
-uv pip install --python=\$python_bin_dir/python3 --system pyyaml jinja2
+{% set python = specs["python"] -%}
+{% set python_exe = "\\$base_dir/"+python.name+"-"+python.version+"-"+python.hash+"/bin/python3" -%}
+uv pip install --python={{ python_exe }} --system pyyaml jinja2
 
 EOT
 
@@ -75,19 +80,6 @@ ENTRYPOINT ["/bin/bash"]
 
 app = typer.Typer()
 console = Console()
-
-# RUN cmake_exe=`find /spack -type f -name cmake -executable` \\
-#     && cmake_bin_dir=`dirname $cmake_exe` \\
-#     && echo "export PATH=$cmake_bin_dir:\$PATH" >> $HOME/.bashrc
-
-
-# RUN {% for name, full_name, url in layers -%}
-#     {% if loop.first %}dir=`find /spack -type d -name "{{ full_name }}*"` \\
-#     && echo "export CMAKE_PREFIX_PATH=$dir" >> $HOME/.bashrc \\
-#     {% else %}&& dir=`find /spack -type d -name "{{ full_name }}*"` \\
-#     && echo "export CMAKE_PREFIX_PATH=\$CMAKE_PREFIX_PATH:$dir" >> $HOME/.bashrc{% if not loop.last %} \\{% endif %}
-#     {% endif %}
-# {%- endfor %}
 
 
 @app.command()
@@ -168,8 +160,13 @@ def main(
 
     preparation_script = preparation_script.replace("\\", "\\\\").replace("$", r"\$")
 
+    by_package = {v["name"]: v for _, v in lockfile["concrete_specs"].items()}
+
     dockerfile = template.render(
-        layers=layers, base_image=base_image, preparation_script=preparation_script
+        layers=layers,
+        base_image=base_image,
+        preparation_script=preparation_script,
+        specs=by_package,
     )
 
     console.print(Panel(Syntax(dockerfile, "dockerfile"), title="Dockerfile"))
