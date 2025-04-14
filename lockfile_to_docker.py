@@ -63,10 +63,7 @@ echo "export PATH=\$cmake_bin_dir:"'\$PATH' >> \$HOME/.bashrc
 python_bin_dir=$(find /spack -type d -name "python-3*")/bin
 echo "export PATH=\$python_bin_dir:"'\$PATH' >> \$HOME/.bashrc
 
-echo "source /.venv/bin/activate" >> \$HOME/.bashrc
-
-uv venv --python=\$python_bin_dir/python3
-uv pip install pyyaml jinja2
+uv pip install --python=\$python_bin_dir/python3 --system pyyaml jinja2
 
 EOT
 
