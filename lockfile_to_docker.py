@@ -19,16 +19,12 @@ from jinja2 import Template
 from typing import Annotated
 
 DOCKERFILE_TEMPLATE = r"""
-# Load root specs as builders
-{% for name, full_name, url in layers -%}
-FROM {{ url }} AS {{ name }}
-{% endfor %}
 
 # Build the final image using base image
 FROM {{ base_image }}
 
 {% for name, full_name, url in layers -%}
-COPY --from={{ name }} /spack /spack
+COPY --from={{ url }} /spack /spack
 {% endfor %}
 
 RUN <<EOT bash
@@ -52,6 +48,9 @@ echo "export CMAKE_PREFIX_PATH=\$dir" >> \$HOME/.bashrc
 echo "export CMAKE_PREFIX_PATH=\$dir:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
 {%- endif -%}
 {%- endfor %}
+
+dir=`find /spack -type d -name "vdt-*"`
+echo "export CMAKE_PREFIX_PATH=\$dir:"'\$CMAKE_PREFIX_PATH' >> \$HOME/.bashrc
 
 # CLHEP has a special location
 clhep_dir=$(dirname $(find /spack -type f -name "CLHEPConfig.cmake"))
@@ -167,7 +166,7 @@ def main(
 
     # preparation_script = "\n".join(lines)
 
-    preparation_script = preparation_script.replace("$", r"\$")
+    preparation_script = preparation_script.replace("\\", "\\\\").replace("$", r"\$")
 
     dockerfile = template.render(
         layers=layers, base_image=base_image, preparation_script=preparation_script
