@@ -96,10 +96,13 @@ console = Console()
 
 @app.command()
 def main(
-    lockfile: Annotated[
+    lockfile_path: Annotated[
         Path,
         typer.Argument(
-            help="Path to the lockfile", exists=True, dir_okay=False, file_okay=True
+            help="Path to the lockfile",
+            exists=True,
+            dir_okay=False,
+            file_okay=True,
         ),
     ],
     output: Annotated[
@@ -119,11 +122,11 @@ def main(
         ),
     ] = "ghcr.io/acts-project/spack-buildcache",
 ):
-    if not lockfile.exists():
-        print(f"Lockfile {lockfile} does not exist")
+    if not lockfile_path.exists():
+        print(f"Lockfile {lockfile_path} does not exist")
         typer.Exit(1)
 
-    with lockfile.open("r") as f:
+    with lockfile_path.open("r") as f:
         lockfile = json.load(f)
 
     layers = []
@@ -134,10 +137,10 @@ def main(
         name = spec["name"]
         version = spec["version"]
         console.print(
-            f"[black]{root_hash[:7]}[/black] [bold]{spec['name']}[cyan]@{spec['version']}[/cyan][/bold]"
+            f"{root_hash[:7]} [bold]{spec['name']}[cyan]@{spec['version']}[/cyan][/bold]"
         )
         console.print(
-            f"{' '*4} ~> [italic black]{oci_url}:[/italic black][bold]{name}[/bold]-[cyan]{version}[/cyan]-[black bold]{root_hash}[/black bold][italic black].spack[/italic black]",
+            f"{' '*4} ~> [italic]{oci_url}:[/italic][bold]{name}[/bold]-[cyan]{version}[/cyan]-[bold]{root_hash}[/bold][italic].spack[/italic]",
             highlight=False,
         )
 
