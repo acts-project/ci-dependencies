@@ -58,7 +58,7 @@ EOT
 RUN cat <<EOF >> ~/.bashrc
 
 declare -a prefixes=(
-{%- for _, spec in specs.items() -%}
+{%- for _, spec in specs.items()|reverse -%}
 {%- if (loop.index-1) % 3 == 0 %}
  {% endif %} {{ spec.name }}-{{ spec.version }}-{{ spec.hash }}
 {%- endfor %}
