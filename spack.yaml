@@ -27,6 +27,11 @@ spack:
     - pythia8@8.311
     - geant4@11.1.3 -data
 
+    # v1.19 and v1.20: abseil sees inconsistent install library names -> configuration fails
+    # v1.21 does not work on AMD due to unsupported instructions vpdpbusds
+    # We're stuck on v1.18.1 for now
+    - py-onnxruntime@1.18.1 dynamic_cpu_arch=NOAVX
+
   packages:
     all:
       target:
