@@ -72,7 +72,7 @@ jobs:
           #   os: ubuntu-latest
           #   default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404:74
+          - image: ghcr.io/acts-project/ubuntu2404:76
             compiler: gcc@13.3.0
             os: ubuntu-24.04-arm
             default: false
