@@ -68,7 +68,7 @@ jobs:
             default: false
 
           - image: ghcr.io/acts-project/ubuntu2404_clang19:76
-            compiler: llvm@19.1.6
+            compiler: llvm@19.1.7
             os: ubuntu-latest
             default: false
 
