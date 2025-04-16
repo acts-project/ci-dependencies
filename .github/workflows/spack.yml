@@ -92,20 +92,33 @@ jobs:
             cp build/spack.lock "spack_${TARGET_ARCH}.lock"
           fi
 
-      - name: Upload lock files
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Creater Dockerfile from spack lockfile
+        if: "inputs.image != '' && !cancelled()"
+        run: |
+          uv run lockfile_to_docker.py \
+            "spack_${TARGET_ARCH}.lock" \
+            -o Dockerfile.${TARGET_ARCH}
+          cp Dockerfile.${TARGET_ARCH} Dockerfile
+
+      - name: Upload lock files and Dockerfiles
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: spack_${{ env.TARGET_TRIPLET }}-locks
           path: |
             spack_*.lock
+            Dockerfile.*
           if-no-files-found: error
 
-      - name: Add lock files to release
+      - name: Add lock files and Dockerfiles to release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
+            Dockerfile.*
             spack_*.lock
 
       - name: Derive base image
