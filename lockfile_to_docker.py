@@ -89,7 +89,7 @@ EOF
 RUN cat <<EOF >> /etc/motd
 =============== ACTS development image with dependencies ===============
 - Clone repository: 
-    git clone https://github.com/acts-project/acts.git
+    git clone https://github.com/acts-project/acts.git --recursive
 - Configure: 
     cmake -S acts -B build -GNinja --preset dev \\
       -DACTS_BUILD_UNITTESTS=OFF -DACTS_BUILD_INTEGRATIONTESTS=OFF
@@ -188,6 +188,8 @@ def main(
     preparation_script = preparation_script.replace("\\", "\\\\").replace("$", r"\$")
 
     by_package = {v["name"]: v for _, v in lockfile["concrete_specs"].items()}
+    by_package.pop("git")
+    by_package.pop("git-lfs")
 
     dockerfile = template.render(
         layers=layers,
