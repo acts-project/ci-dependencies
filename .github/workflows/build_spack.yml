@@ -47,29 +47,39 @@ jobs:
       matrix:
 
         include:
-          - image: ghcr.io/acts-project/alma9-base:74
+          - image: ghcr.io/acts-project/alma9-base:77
             compiler: gcc@11.5.0
+            os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2204:74
+          - image: ghcr.io/acts-project/ubuntu2204:77
             compiler: gcc@11.4.0
+            os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404:74
+          - image: ghcr.io/acts-project/ubuntu2404:77
             compiler: gcc@13.3.0
+            os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404:74
+          - image: ghcr.io/acts-project/ubuntu2404:77
             compiler: llvm@18.1.3
+            os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang19:74
-            compiler: llvm@19.1.6
+          - image: ghcr.io/acts-project/ubuntu2404_clang19:77
+            compiler: llvm@19.1.7
+            os: ubuntu-latest
+            default: false
+
+          - image: ghcr.io/acts-project/ubuntu2404:77
+            compiler: gcc@13.3.0
+            os: ubuntu-24.04-arm
             default: false
 
     uses: ./.github/workflows/spack.yml
     with:
-      os: ubuntu-latest
+      os: ${{ matrix.os }}
       image: ${{ matrix.image }}
       compiler: ${{ matrix.compiler }}
       default: ${{ matrix.default }}
