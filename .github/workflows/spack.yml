@@ -168,6 +168,7 @@ jobs:
           popd
 
   build_docker:
+    if: "inputs.image != ''"
     runs-on: "${{ inputs.os }}"
     needs: [build]
     steps:
