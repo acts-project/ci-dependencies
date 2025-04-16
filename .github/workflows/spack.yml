@@ -99,8 +99,8 @@ jobs:
         if: "inputs.image != '' && !cancelled()"
         run: |
           uv run lockfile_to_docker.py \
-            "spack_${TARGET_ARCH}.lock" \
-            -o Dockerfile.${TARGET_ARCH}
+            "spack_${TARGET_TRIPLET}.lock" \
+            -o Dockerfile.${TARGET_TRIPLET}
 
       - name: Upload lock files and Dockerfiles
         uses: actions/upload-artifact@v4
