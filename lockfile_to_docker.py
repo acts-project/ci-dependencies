@@ -136,6 +136,7 @@ def main(
             help="OCI URL to use. If not provided, will use the default OCI URL"
         ),
     ] = "ghcr.io/acts-project/spack-buildcache",
+    verbose: bool = False,
 ):
     if not lockfile_path.exists():
         print(f"Lockfile {lockfile_path} does not exist")
@@ -198,10 +199,14 @@ def main(
         specs=by_package,
     )
 
-    console.print(Panel(Syntax(dockerfile, "dockerfile"), title="Dockerfile"))
+    if verbose:
+        console.print(Panel(Syntax(dockerfile, "dockerfile"), title="Dockerfile"))
 
     if output is not None:
         output.write_text(dockerfile)
+        console.print(
+            f"Generated Dockerfile written to [bold]{output.resolve()}[/bold]"
+        )
 
 
 if __name__ == "__main__":
