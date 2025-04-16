@@ -176,9 +176,9 @@ jobs:
 
       - run: |
           ls -al
-          ls -al spack-*
-          echo "TARGET_ARCH="$(echo spack-* | sed -E 's/spack_(.*)-locks/\1/g' | sed 's/@/_/g') >> $GITHUB_ENV
-          cp spack-*/Dockerfile.* .
+          ls -al spack_*
+          echo "TARGET_ARCH="$(echo spack_* | sed -E 's/spack_(.*)-locks/\1/g' | sed 's/@/_/g') >> $GITHUB_ENV
+          cp spack_*/Dockerfile.* .
           ls -al
         
 
