@@ -29,8 +29,8 @@ jobs:
     runs-on: "${{ inputs.os }}"
 
     outputs:
-      target_arch: steps.lockfile_bookkeeping.outputs.TARGET_ARCH
-      target_triplet: steps.lockfile_bookkeeping.outputs.TARGET_TRIPLET
+      target_arch: ${{ steps.lockfile_bookkeeping.outputs.TARGET_ARCH }}
+      target_triplet: ${{ steps.lockfile_bookkeeping.outputs.TARGET_TRIPLET }}
 
     steps:
       - uses: actions/checkout@v4
