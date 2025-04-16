@@ -27,6 +27,11 @@ jobs:
 
   build:
     runs-on: "${{ inputs.os }}"
+
+    outputs:
+      target_arch: steps.lockfile_bookkeeping.outputs.TARGET_ARCH
+      target_triplet: steps.lockfile_bookkeeping.outputs.TARGET_TRIPLET
+
     steps:
       - uses: actions/checkout@v4
 
@@ -85,12 +90,15 @@ jobs:
       - name: Lockfile bookkeeping
         shell: bash
         if: always()
+        id: lockfile_bookkeeping
         run: |
           cp build/spack.lock "spack_${TARGET_TRIPLET}.lock"
           if [[ "${{ inputs.default }}" == "true" ]]; then
             # this will be become the default combination for this architecture
             cp build/spack.lock "spack_${TARGET_ARCH}.lock"
           fi
+          echo "TARGET_TRIPLET=${TARGET_TRIPLET}" >> "$GITHUB_OUTPUT"
+          echo "TARGET_ARCH=${TARGET_ARCH}" >> "$GITHUB_OUTPUT"
 
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v5
@@ -171,17 +179,22 @@ jobs:
     if: "inputs.image != ''"
     runs-on: "${{ inputs.os }}"
     needs: [build]
+
+    env:
+      TARGET_ARCH: ${{ needs.build.outputs.target_arch }}
+      TARGET_TRIPLET: ${{ needs.build.outputs.target_triplet }}
+
     steps:
       - name: Download all workflow run artifacts
         uses: actions/download-artifact@v4
+        with:
+          name: spack_${{ env.TARGET_TRIPLET }}-locks
 
       - run: |
           ls -al
           ls -al spack_*
-          echo "TARGET_ARCH="$(echo spack_* | sed -E 's/spack_(.*)-locks/\1/g' | sed 's/@/_/g') >> $GITHUB_ENV
-          cp spack_*/Dockerfile.* Dockerfile
+          cp spack_${TARGET_TRIPLET}/Dockerfile.* Dockerfile
           ls -al
-        
 
       - uses: docker/login-action@v3
         if: "inputs.image != '' && !cancelled()"
