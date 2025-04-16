@@ -174,7 +174,13 @@ jobs:
       - name: Download all workflow run artifacts
         uses: actions/download-artifact@v4
 
-      - run: ls -al
+      - run: |
+          ls -al
+          ls -al spack-*
+          echo "TARGET_ARCH="$(echo spack-* | sed -E 's/spack_(.*)-locks/\1/g' | sed 's/@/_/g') >> $GITHUB_ENV
+          cp spack-*/Dockerfile.* .
+          ls -al
+        
 
       - uses: docker/login-action@v3
         if: "inputs.image != '' && !cancelled()"
