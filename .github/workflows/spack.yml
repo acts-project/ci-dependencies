@@ -207,16 +207,15 @@ jobs:
         with:
           # list of Docker images to use as base name for tags
           images: |
-            ghcr.io/${{ github.repository_owner  }}/spack_container_${{ env.TARGET_ARCH }}
+            ghcr.io/${{ github.repository_owner  }}/spack_container
           # generate Docker tags based on the following events/attributesk
           tags: |
             type=schedule
             type=ref,event=branch
             type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}_${{ env.TARGET_ARCH }}
+            type=semver,pattern={{major}}.{{minor}}_${{ env.TARGET_ARCH }}
+            type=semver,pattern={{major}}_${{ env.TARGET_ARCH }}
             type=sha        
 
       - name: Build and push
