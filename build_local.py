@@ -257,6 +257,7 @@ def main(
     reinstall_spack: bool = False,
     fail_fast: bool = False,
     spack_patches: list[str] = [],
+    external_spack: Path | None = None,
 ):
 
     console = Console()
@@ -270,7 +271,16 @@ def main(
     if not base_dir.exists():
         base_dir.mkdir(parents=True)
 
-    spack_root = base_dir / "spack"
+    if external_spack is not None:
+        if not external_spack.exists():
+            log.error(
+                "--external-spack was given, but %s does not exist", external_spack
+            )
+            raise typer.Exit(1)
+
+        spack_root = external_spack
+    else:
+        spack_root = base_dir / "spack"
     build_dir = base_dir / "build"
 
     if mode == Mode.container:
@@ -294,7 +304,8 @@ def main(
         elif ignore:
             pass
         else:
-            raise RuntimeError(f"Build directory {build_dir} already exists")
+            log.error("Build directory %s already exists", build_dir)
+            raise typer.Exit(1)
 
     build_dir.mkdir(parents=True, exist_ok=True)
 

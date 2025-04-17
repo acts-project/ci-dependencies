@@ -27,6 +27,11 @@ jobs:
 
   build:
     runs-on: "${{ inputs.os }}"
+
+    outputs:
+      target_arch: ${{ steps.lockfile_bookkeeping.outputs.TARGET_ARCH }}
+      target_triplet: ${{ steps.lockfile_bookkeeping.outputs.TARGET_TRIPLET }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -85,27 +90,42 @@ jobs:
       - name: Lockfile bookkeeping
         shell: bash
         if: always()
+        id: lockfile_bookkeeping
         run: |
           cp build/spack.lock "spack_${TARGET_TRIPLET}.lock"
           if [[ "${{ inputs.default }}" == "true" ]]; then
             # this will be become the default combination for this architecture
             cp build/spack.lock "spack_${TARGET_ARCH}.lock"
           fi
+          echo "TARGET_TRIPLET=${TARGET_TRIPLET}" >> "$GITHUB_OUTPUT"
+          echo "TARGET_ARCH=${TARGET_ARCH}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload lock files
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Creater Dockerfile from spack lockfile
+        if: "inputs.image != '' && !cancelled()"
+        run: |
+          uv run lockfile_to_docker.py \
+            "spack_${TARGET_TRIPLET}.lock" \
+            -o Dockerfile.${TARGET_TRIPLET}
+
+      - name: Upload lock files and Dockerfiles
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: spack_${{ env.TARGET_TRIPLET }}-locks
           path: |
             spack_*.lock
+            Dockerfile.*
           if-no-files-found: error
 
-      - name: Add lock files to release
+      - name: Add lock files and Dockerfiles to release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
+            Dockerfile.*
             spack_*.lock
 
       - name: Derive base image
@@ -155,75 +175,53 @@ jobs:
           ../spack_push.sh
           popd
 
-      #
-      # - name: List visible compilers
-      #   run: |
-      #     spack compiler find
-      #     spack compilers
-      #
-      # - name: Locate OpenGL
-      #   run: ./opengl.sh
-      #
-      #
-      # - name: Select compiler
-      #   if: inputs.compiler != ''
-      #   run: |
-      #     spack compilers | grep "${{ inputs.compiler }}"
-      #     spack -e . config add 'packages:all:require: ["%${{ inputs.compiler }}"]'
-      #
-      # - name: Spack concretize
-      #   run: |
-      #     spack -e . concretize -Uf
-      #     spack -e . find
-      #
-      # - name: Lockfile bookkeeping
-      #   shell: bash
-      #   run: |
-      #     arch=$(spack arch --family)
-      #     export TARGET_TRIPLET="${arch}_${{ inputs.compiler }}"
-      #     echo "TARGET_TRIPLET=${TARGET_TRIPLET}" >> "$GITHUB_ENV"
-      #     cp spack.lock "spack_${TARGET_TRIPLET}.lock"
-      #     if [[ "${{ inputs.default }}" == "true" ]]; then
-      #       # this will be become the default combination for this architecture
-      #       cp spack.lock "spack_${arch}.lock"
-      #     fi
+  build_docker:
+    if: "inputs.image != ''"
+    runs-on: "${{ inputs.os }}"
+    needs: [build]
 
-      # KEEP:
-      # - name: Upload lock files
-      #   uses: actions/upload-artifact@v4
-      #   if: always()
-      #   with:
-      #     name: spack_${{ env.TARGET_TRIPLET }}-locks
-      #     path: |
-      #       spack_*.lock
-      #     if-no-files-found: error
-      #
-      # - name: Spack build
-      #   run: |
-      #     spack -e . install --no-check-signature --show-log-on-error
-      #
-      # - name: Add lock files to release
-      #   uses: softprops/action-gh-release@v2
-      #   if: startsWith(github.ref, 'refs/tags/')
-      #   with:
-      #     files: |
-      #       spack_*.lock
-      #
-      # - name: Push packages and update index
-      #   if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !cancelled()
-      #   env:
-      #     GH_OCI_USER: "${{ github.actor }}"
-      #     GH_OCI_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-      #   shell: bash
-      #   run: |
-      #     if [[ "${{ inputs.image }}" != "" ]]; then
-      #       export BASE_IMAGE="${{ inputs.image }}"
-      #     elif [[ "${{ inputs.os }}" == "ubuntu-22.04" ]]; then
-      #       export BASE_IMAGE="ubuntu:22.04"
-      #     elif [[ "${{ inputs.os }}" == "ubuntu-24.04" ]]; then
-      #       export BASE_IMAGE="ubuntu:24.04"
-      #     else
-      #       export BASE_IMAGE="ubuntu:24.04"
-      #     fi
-      #     echo "BASE IMAGE: ${BASE_IMAGE}"
-      #     ./retry.sh spack -e . buildcache push --base-image "${BASE_IMAGE}" --unsigned --update-index acts-spack-buildcache
+    env:
+      TARGET_ARCH: ${{ needs.build.outputs.target_arch }}
+      TARGET_TRIPLET: ${{ needs.build.outputs.target_triplet }}
+
+    steps:
+      - name: Download all workflow run artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: spack_${{ env.TARGET_TRIPLET }}-locks
+
+      - run: |
+          cp Dockerfile.* Dockerfile
+
+      - uses: docker/login-action@v3
+        if: "inputs.image != '' && !cancelled()"
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker meta
+        if: "inputs.image != '' && !cancelled()"
+        uses: docker/metadata-action@v5
+        with:
+          # list of Docker images to use as base name for tags
+          images: |
+            ghcr.io/${{ github.repository_owner  }}/spack_container_${{ env.TARGET_ARCH }}
+          # generate Docker tags based on the following events/attributesk
+          tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+
+      - name: Build and push
+        if: "inputs.image != '' && !cancelled()"
+        uses: docker/build-push-action@v5
+        with:
+          # Push only on tags
+          push: ${{ startsWith(github.ref, 'refs/tags/') }}
+          context: .
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
