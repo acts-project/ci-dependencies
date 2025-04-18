@@ -54,6 +54,7 @@ jobs:
           echo "Removing large packages"
           ./uninstall_packages.sh
           df -h
+
       - name: Setup Xcode version
         if: startsWith(inputs.os, 'macos')
         uses: maxim-lobanov/setup-xcode@v1
@@ -185,6 +186,19 @@ jobs:
       TARGET_TRIPLET: ${{ needs.build.outputs.target_triplet }}
 
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove packages to save disk
+        if: startsWith(inputs.os, 'ubuntu')
+        run: |
+          df -h
+          sudo apt-get update
+          echo "Listing 25 largest packages"
+          dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 25
+          echo "Removing large packages"
+          ./uninstall_packages.sh
+          df -h
+
       - name: Download all workflow run artifacts
         uses: actions/download-artifact@v4
         with:
