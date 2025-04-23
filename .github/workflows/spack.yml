@@ -31,6 +31,7 @@ jobs:
     outputs:
       target_arch: ${{ steps.lockfile_bookkeeping.outputs.TARGET_ARCH }}
       target_triplet: ${{ steps.lockfile_bookkeeping.outputs.TARGET_TRIPLET }}
+      target_triplet_slug: ${{ steps.lockfile_bookkeeping.outputs.TARGET_TRIPLET_SLUG }}
 
     steps:
       - uses: actions/checkout@v4
@@ -100,6 +101,7 @@ jobs:
           fi
           echo "TARGET_TRIPLET=${TARGET_TRIPLET}" >> "$GITHUB_OUTPUT"
           echo "TARGET_ARCH=${TARGET_ARCH}" >> "$GITHUB_OUTPUT"
+          echo "TARGET_TRIPLET_SLUG=${TARGET_TRIPLET}" | sed 's/@/-/g' >> "$GITHUB_OUTPUT"
 
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v5
@@ -184,6 +186,7 @@ jobs:
     env:
       TARGET_ARCH: ${{ needs.build.outputs.target_arch }}
       TARGET_TRIPLET: ${{ needs.build.outputs.target_triplet }}
+      TARGET_TRIPLET_SLUG: ${{ needs.build.outputs.target_triplet_slug }}
 
     steps:
       - uses: actions/checkout@v4
@@ -227,9 +230,9 @@ jobs:
             type=schedule
             type=ref,event=branch
             type=ref,event=pr
-            type=semver,pattern={{version}}_${{ env.TARGET_ARCH }}
-            type=semver,pattern={{major}}.{{minor}}_${{ env.TARGET_ARCH }}
-            type=semver,pattern={{major}}_${{ env.TARGET_ARCH }}
+            type=semver,pattern={{version}}_${{ env.TARGET_TRIPLET_SLUG }}
+            type=semver,pattern={{major}}.{{minor}}_${{ env.TARGET_TRIPLET_SLUG }}
+            type=semver,pattern={{major}}_${{ env.TARGET_TRIPLET_SLUG }}
 
       - name: Build and push
         if: "inputs.image != '' && !cancelled()"
