@@ -51,7 +51,8 @@ uv pip install --python={{ python_exe }} --system pyyaml jinja2
 
 {% set geant4 = specs["geant4"] -%}
 {% set geant4_dir = "\\$base_dir/"+geant4.name+"-"+geant4.version+"-"+geant4.hash+"/share/Geant4/data" -%}
-ln -s {{ geant4_dir }} /g4data
+mkdir /g4data
+ln -sf /g4data {{ geant4_dir }}
 
 EOT
 
