@@ -36,7 +36,7 @@ RUN curl -LsSf https://astral.sh/uv/0.6.14/install.sh | sh
 ENV PATH=/root/.local/bin:$PATH
 
 ENV CCACHE_DIR=/ccache
-mkdir /ccache
+RUN mkdir /ccache
 
 RUN <<EOT bash
 set -eux
