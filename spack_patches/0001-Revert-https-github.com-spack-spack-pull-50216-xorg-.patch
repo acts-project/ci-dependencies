@@ -1,0 +1,25 @@
+From a38ee5633f47d6eeac224074364a578edc67d09a Mon Sep 17 00:00:00 2001
+From: Paul Gessinger <hello@paulgessinger.com>
+Date: Tue, 29 Apr 2025 13:26:39 +0200
+Subject: [PATCH] Revert https://github.com/spack/spack/pull/50216 (xorg vs
+ darwin)
+
+---
+ lib/spack/spack/build_systems/xorg.py | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/lib/spack/spack/build_systems/xorg.py b/lib/spack/spack/build_systems/xorg.py
+index 47ba83d21a..e527bb5445 100644
+--- a/lib/spack/spack/build_systems/xorg.py
++++ b/lib/spack/spack/build_systems/xorg.py
+@@ -15,7 +15,6 @@ class XorgPackage(spack.package_base.PackageBase):
+ 
+     # x.org packages are not supported on windows or darwin
+     conflicts("platform=windows")
+-    conflicts("platform=darwin")
+ 
+     #: Path of the package in a x.org mirror
+     xorg_mirror_path: Optional[str] = None
+-- 
+2.39.5 (Apple Git-154)
+
