@@ -40,12 +40,11 @@ jobs:
         uses: spack/setup-spack@v2
 
       - name: Apply spack patches
-        working-directory: spack
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          for f in ../spack_patches/*.patch; do
-            git am -3 "$f"
+          for f in spack_patches/*.patch; do
+            git -C spack am -3 "$f"
           done
 
 
