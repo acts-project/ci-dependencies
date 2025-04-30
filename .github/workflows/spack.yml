@@ -43,9 +43,11 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          for f in spack_patches/*.patch; do
-            git -C spack am -3 "$f"
-          done
+          if [ -d spack_patches ]; then
+            for f in spack_patches/*.patch; do
+              git -C spack am -3 "$f"
+            done
+          fi
 
 
       - name: Remove packages to save disk
