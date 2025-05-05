@@ -6,13 +6,13 @@ include(GNUInstallDirs)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 set(PYTHON_VERSION 3.12.2)
-set(TBB_VERSION 2021.11.0)
-set(GEANT4_VERSION 11.1.3)
-set(HEPMC3_VERSION 3.2.5)
+set(TBB_VERSION 2022.1.0)
+set(GEANT4_VERSION 11.3.2)
+set(HEPMC3_VERSION 3.3.1)
 set(PYTHIA8_VERSION 311)
-set(JSON_VERSION 3.11.2)
-set(ROOT_VERSION 6.32.08)
-set(ROOT_HASH SHA1=25b7d57509da622eb46b3cb2632f307d4a2f2361)
+set(JSON_VERSION 3.12.0)
+set(ROOT_VERSION 6.34.08)
+set(ROOT_HASH SHA1=45d2ffd78c61c8a09f4874184ee34c286ce9ae25)
 set(PODIO_VERSION 00-17-02)
 set(EDM4HEP_VERSION 00-10-01)
 set(DD4HEP_VERSION 01-29)
@@ -188,6 +188,11 @@ if(APPLE)
   execute_process(COMMAND brew --prefix openssl
                   OUTPUT_VARIABLE OPENSSL_DIR)
   set(openssl_option "--with-openssl=${OPENSSL_DIR}")
+  if(NOT CMAKE_OSX_SYSROOT)
+      message(STATUS "CMAKE_OSX_SYSROOT not set, probably due to CMake > 4.0")
+      message(STATUS "Please set it to something like /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/")
+  endif()
+  set(CMAKE_OSX_SYSROOT "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/")
   message(STATUS "Sysroot: ${CMAKE_OSX_SYSROOT}")
 endif()
 
@@ -272,7 +277,7 @@ ExternalProject_Add(eigen
 ExternalProject_Add(tbb
   PREFIX tbb
   URL https://github.com/oneapi-src/oneTBB/archive/refs/tags/v${TBB_VERSION}.tar.gz
-  URL_HASH SHA1=740e86b703f42446ddde392b73a9db3dc0f5f4cd
+  URL_HASH SHA1=6f3a630481452a119f88787cac3b3563a2632d2e
   CMAKE_ARGS
   -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
   -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
@@ -288,7 +293,7 @@ ExternalProject_Add(tbb
 ExternalProject_Add(geant4
   PREFIX geant4
   URL https://gitlab.cern.ch/geant4/geant4/-/archive/v${GEANT4_VERSION}/geant4-v${GEANT4_VERSION}.tar.gz
-  URL_HASH SHA1=69119e8a29d3bd79b70886dc7ae78e6d008e1753
+  URL_HASH SHA1=dfe40b6fa6f5da4dbce6941d41839261ef5fefd3
   CMAKE_ARGS
   -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
   -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
@@ -309,7 +314,7 @@ ExternalProject_Add(geant4
 ExternalProject_Add(hepmc3
   PREFIX hepmc3
   URL https://gitlab.cern.ch/hepmc/HepMC3/-/archive/${HEPMC3_VERSION}/HepMC3-${HEPMC3_VERSION}.tar.gz
-  URL_HASH SHA1=d4c12f5d50a507cd60cf2377286cbd23f59f1f84
+  URL_HASH SHA1=54b45fdc63a7abd08c0244d2b09f020f4d9964f8
   CMAKE_ARGS
   -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
   -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
@@ -349,7 +354,7 @@ ExternalProject_Add(pythia8
 ExternalProject_Add(nlohmann_json
   PREFIX nlohmann_json
   URL https://github.com/nlohmann/json/archive/refs/tags/v${JSON_VERSION}.tar.gz
-  URL_HASH SHA1=1b0701dc7fdc068aad8ce68fc3e019a038232437
+  URL_HASH SHA1=815212d8acbddc87009667c52ba98a8404efec18
   CMAKE_ARGS
   -DJSON_BuildTests=OFF
   -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
@@ -409,13 +414,12 @@ ExternalProject_Add(root
   -Dbuiltin_tbb=OFF
   -Dbuiltin_cfitsio=ON
   -Dbuiltin_xxhash=ON
-  -Dbuiltin_afterimage=ON
   -Dbuiltin_openssl=OFF
   -Dbuiltin_ftgl=ON
   -Dbuiltin_gsl=ON
   -Dbuiltin_gl2ps=ON
   -Dbuiltin_glew=ON
-  -Dbuiltin_pcre=ON
+  -Dbuiltin_pcre=OFF
   -Dgfal=OFF
   -Ddavix=OFF
   -Dbuiltin_vdt=ON
