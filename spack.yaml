@@ -1,32 +1,33 @@
 spack:
   specs:
-    - boost@1.88.0 +program_options +test +json +graph +filesystem
-    - cmake@3.31.6
-    - edm4hep@0.99.2
+    - boost@1.77.0 +program_options +test +json # first version to support cxxstd=20
+    - cmake@3.14.7
+
+    - edm4hep@0.10.5
     - eigen@3.4.0
     - git-lfs@3.5.1
-    - intel-tbb@2022.0.0
-    - nlohmann-json@3.11.3
-    - podio@1.3
-    - root@6.34.08 -aqua -opengl
-    - dd4hep@1.32 +xercesc +edm4hep +hepmc3
-    - geomodel@6.15.0 +geomodelg4
-    - python@3.13.2
+    - intel-tbb@2020.1
+    - nlohmann-json@3.10.5
+    - podio@0.17.4
+    - root@6.28.04 -aqua -opengl -x ^libpng+pic 
+    - dd4hep@1.26 +xercesc +edm4hep +hepmc3
+    - geomodel@6.3.0 +geomodelg4
+    - python@3.9
     - py-pybind11 @2.13.6
     - py-pip
     - py-jinja2 # for edm4hep + podio
     - py-pyyaml # for edm4hep + podio
 
-    - hepmc3@3.3.0 +rootio
+    - hepmc3@3.2.4 +rootio
     # compression libraries that can be used by hepmc3 if configured
     - zstd
     - lz4
     - zlib-ng
     - bzip2
 
-    - pythia8@8.313 -hepmc +hepmc3
-    - geant4@11.3.2 -data
-    - fastjet@3.4.3 plugins=cxx
+    - pythia8@8.310 -hepmc +hepmc3
+    - geant4@11.1.3 -data
+    - fastjet@3.4.1 plugins=cxx
 
   packages:
     all:
