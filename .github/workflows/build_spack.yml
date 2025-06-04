@@ -33,6 +33,11 @@ jobs:
            compiler: "apple-clang@16.0.0"
            default: true
 
+         - os: macos-15
+           xcode: "16.3.0"
+           compiler: "apple-clang@17.0.0"
+           default: true
+
     uses: ./.github/workflows/spack.yml
     with:
       os: ${{ matrix.os }}
