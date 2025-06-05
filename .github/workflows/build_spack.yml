@@ -19,11 +19,6 @@ jobs:
         include:
 
          - os: macos-14
-           xcode: "15.0.1"
-           compiler: "apple-clang@15.0.0"
-           default: false
-
-         - os: macos-14
            xcode: "16.2.0"
            compiler: "apple-clang@16.0.0"
            default: true
