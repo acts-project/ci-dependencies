@@ -49,7 +49,7 @@ end_section
 
 start_section "List visible compilers"
 spack -e . compiler find --scope "env:$PWD"
-spack -e . compilers
+spack -e . compiler list
 end_section
 
 start_section "Locate OpenGL"
@@ -57,9 +57,9 @@ start_section "Locate OpenGL"
 end_section
 
 start_section "Select compiler"
-spack -e . compilers 
+spack -e . compiler list
 echo "Looking for compiler: $COMPILER"
-spack -e . compilers | grep "$COMPILER"
+spack -e . compiler list | grep "$COMPILER"
 spack -e . config add "packages:all:require: [\"%$COMPILER\"]"
 end_section
 
