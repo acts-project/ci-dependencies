@@ -7,6 +7,7 @@
 #   "python-slugify",
 #   "docker",
 #   "httpx",
+#   "PyYAML",
 # ]
 # ///
 
@@ -17,8 +18,10 @@ import os
 import shutil
 import enum
 from abc import ABC, abstractmethod
+import tempfile
 import contextlib
 import logging
+import yaml
 
 import typer
 import slugify
@@ -244,7 +247,7 @@ def checkpoint(label: str):
 
 
 @app.command()
-def main(
+def build(
     base_dir: Annotated[Path, typer.Option(file_okay=False)],
     compiler: Annotated[str, typer.Option()],
     image: Annotated[str, typer.Option()],
@@ -367,6 +370,59 @@ def main(
     except Exception:
         log.error("Terminating build due to error")
         return typer.Exit(1)
+
+
+@app.command()
+def matrix(
+    base_dir: Annotated[Path | None, typer.Option(file_okay=False)] = None,
+    force: Annotated[bool, typer.Option("-f", "--force")] = False,
+    ignore: Annotated[bool, typer.Option("-i", "--ignore")] = False,
+    build_flag: Annotated[bool, typer.Option("--build")] = True,
+    push: bool = True,
+    spack_version: str = "develop",
+    reinstall_spack: bool = False,
+    fail_fast: bool = False,
+    spack_patches: list[str] = [],
+    external_spack: Path | None = None,
+):
+
+    log.info("Finding matrix configuration from CI config")
+    with (Path(__file__).parent / ".github/workflows/build_spack.yml").open() as fh:
+        config = yaml.safe_load(fh)
+    matrix = config["jobs"]["build_container"]["strategy"]["matrix"]["include"]
+
+    log.info("Will run the following combinations:")
+    for entry in matrix:
+        image = entry["image"]
+        compiler = entry["compiler"]
+        os = entry["os"]
+        log.info(f"{image=}, {compiler=}, {os=}")
+
+    with contextlib.ExitStack() as ex:
+        if base_dir is None:
+            base_dir = Path(ex.enter_context(tempfile.TemporaryDirectory()))
+            log.info(f"Using temporary directory {base_dir}")
+
+        for entry in matrix:
+            image = entry["image"]
+            compiler = entry["compiler"]
+            os = entry["os"]
+
+            build(
+                base_dir=base_dir,
+                compiler=compiler,
+                image=image,
+                force=force,
+                ignore=ignore,
+                build=build_flag,
+                push=push,
+                mode=Mode.container,
+                spack_version=spack_version,
+                spack_patches=spack_patches,
+                reinstall_spack=reinstall_spack,
+                fail_fast=fail_fast,
+                external_spack=external_spack,
+            )
 
 
 app()
