@@ -111,30 +111,6 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Creater Dockerfile from spack lockfile
-        if: "inputs.image != '' && !cancelled()"
-        run: |
-          uv run lockfile_to_docker.py \
-            "spack_${TARGET_TRIPLET}.lock" \
-            -o Dockerfile.${TARGET_TRIPLET}
-
-      - name: Upload lock files and Dockerfiles
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: spack_${{ env.TARGET_TRIPLET }}-locks
-          path: |
-            spack_*.lock
-            Dockerfile.*
-          if-no-files-found: error
-
-      - name: Add lock files and Dockerfiles to release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: |
-            Dockerfile.*
-            spack_*.lock
 
       - name: Derive base image
         shell: bash
@@ -155,6 +131,32 @@ jobs:
         if: "!cancelled()"
         run: |
           echo "BASE IMAGE: ${BASE_IMAGE}"
+
+      - name: Create Dockerfile from spack lockfile
+        if: "inputs.image != '' && !cancelled()"
+        run: |
+          uv run lockfile_to_docker.py \
+            "spack_${TARGET_TRIPLET}.lock" \
+            --base-image ${BASE_IMAGE} \
+            -o Dockerfile.${TARGET_TRIPLET}
+
+      - name: Upload lock files and Dockerfiles
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spack_${{ env.TARGET_TRIPLET }}-locks
+          path: |
+            spack_*.lock
+            Dockerfile.*
+          if-no-files-found: error
+
+      - name: Add lock files and Dockerfiles to release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            Dockerfile.*
+            spack_*.lock
 
       - name: Push spack cache (container)
         if: "inputs.image != '' && !cancelled()"
