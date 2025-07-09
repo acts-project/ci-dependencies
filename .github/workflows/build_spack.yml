@@ -52,11 +52,6 @@ jobs:
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2204:80
-            compiler: gcc@11.4.0
-            os: ubuntu-latest
-            default: true
-
           - image: ghcr.io/acts-project/ubuntu2404:80
             compiler: gcc@13.3.0
             os: ubuntu-latest
