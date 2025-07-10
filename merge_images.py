@@ -50,7 +50,8 @@ def main(
     console = Console()
 
     if version.startswith("v"):
-        raise RuntimeError("Version cannot start with v")
+        version = version[1:]
+
     assets = get_release_assets(version)
     dockerfiles = [a["name"] for a in assets if a["name"].startswith("Dockerfile.")]
 
