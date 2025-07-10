@@ -18,14 +18,14 @@ on:
         required: false
         type: string
         default: ""
+      compiler_path:
+        required: false
+        type: string
+        default: ""
       default:
         required: false
         type: boolean
         default: false
-      setup:
-        required: false
-        type: boolean
-        default: ""
 
 jobs:
 
