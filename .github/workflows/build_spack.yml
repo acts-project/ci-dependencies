@@ -99,5 +99,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build merged manifest and push to regisrty
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           uv run merge_images.py ${{ github.ref_name }} ".*ubuntu24.04.*gcc.*" --push
