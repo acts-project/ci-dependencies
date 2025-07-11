@@ -36,6 +36,7 @@ if [ -z "${COMPILER:-}" ]; then
     exit 1
 fi
 
+
 start_section "Setting up spack from $SPACK_ROOT"
 source "$SPACK_ROOT"/share/spack/setup-env.sh
 end_section
@@ -48,7 +49,11 @@ spack env create -d . "$SCRIPT_DIR"/spack.yaml
 end_section
 
 start_section "List visible compilers"
+if [ -n "${COMPILER_PATH:-}" ]; then
+spack -e . compiler find --scope "env:$PWD" "${COMPILER_PATH:-}"
+else
 spack -e . compiler find --scope "env:$PWD"
+fi
 spack -e . compiler list
 end_section
 

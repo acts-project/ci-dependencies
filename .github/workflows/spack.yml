@@ -18,6 +18,10 @@ on:
         required: false
         type: string
         default: ""
+      compiler_path:
+        required: false
+        type: string
+        default: ""
       default:
         required: false
         type: boolean
@@ -78,6 +82,7 @@ jobs:
             -v "$GITHUB_ENV:/github_env"\
             -e "SPACK_ROOT=/spack" \
             -e "COMPILER=${{ inputs.compiler }}" \
+            -e "COMPILER_PATH=${{ inputs.compiler_path }}" \
             -e "GITHUB_ENV=/github_env" \
             -e "GITHUB_ACTIONS=${GITHUB_ACTIONS}" \
             -w /build \
@@ -89,6 +94,7 @@ jobs:
         run: |
           export COMPILER=${{ inputs.compiler }}
           export SPACK_ROOT=$(spack location -r)
+          export COMPILER_PATH="${{ inputs.compiler_path }}"
           mkdir build
           pushd build
           ../spack_build.sh

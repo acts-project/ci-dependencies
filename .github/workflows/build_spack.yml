@@ -47,27 +47,28 @@ jobs:
       matrix:
 
         include:
-          - image: ghcr.io/acts-project/alma9-base:80
-            compiler: gcc@11.5.0
+          - image: ghcr.io/acts-project/alma9-base:81
+            compiler: gcc@14.2.1
+            compiler_path: "/opt/rh/gcc-toolset-14/root"
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404:80
+          - image: ghcr.io/acts-project/ubuntu2404:81
             compiler: gcc@13.3.0
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404:80
+          - image: ghcr.io/acts-project/ubuntu2404:81
             compiler: llvm@18.1.3
             os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang19:80
+          - image: ghcr.io/acts-project/ubuntu2404_clang19:81
             compiler: llvm@19.1.7
             os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404:80
+          - image: ghcr.io/acts-project/ubuntu2404:81
             compiler: gcc@13.3.0
             os: ubuntu-24.04-arm
             default: false
@@ -77,6 +78,7 @@ jobs:
       os: ${{ matrix.os }}
       image: ${{ matrix.image }}
       compiler: ${{ matrix.compiler }}
+      compiler_path: ${{ matrix.compiler_path }}
       default: ${{ matrix.default }}
     secrets: inherit
 
