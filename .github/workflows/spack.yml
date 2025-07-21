@@ -83,6 +83,8 @@ jobs:
             -e "SPACK_ROOT=/spack" \
             -e "COMPILER=${{ inputs.compiler }}" \
             -e "COMPILER_PATH=${{ inputs.compiler_path }}" \
+            -e "GH_OCI_USER=${{ github.actor }}" \
+            -e "GH_OCI_TOKEN=${{ secrets.GITHUB_TOKEN }}" \
             -e "GITHUB_ENV=/github_env" \
             -e "GITHUB_ACTIONS=${GITHUB_ACTIONS}" \
             -w /build \
@@ -95,6 +97,8 @@ jobs:
           export COMPILER=${{ inputs.compiler }}
           export SPACK_ROOT=$(spack location -r)
           export COMPILER_PATH="${{ inputs.compiler_path }}"
+          export GH_OCI_USER="${{ github.actor }}"
+          export GH_OCI_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           mkdir build
           pushd build
           ../spack_build.sh
