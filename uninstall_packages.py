@@ -30,7 +30,7 @@ packages.sort(key=lambda pkg: pkg[0], reverse=True)
 num = 50
 print("Top", num, "heaviest packages:")
 for _, (size, pkg) in zip(range(num), packages):
-    print("-", pkg, f"{size/1e6}G")
+    print("-", pkg, f"{size/1e3}M")
 
 packages_to_remove = []
 remove_patterns = [
