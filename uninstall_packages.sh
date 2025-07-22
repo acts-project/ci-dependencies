@@ -16,4 +16,24 @@ done
 
 sudo apt-get autoremove -y
 sudo apt-get clean
+
 rm -rf /usr/share/dotnet/
+
+rm -rf /home/packer
+rm -rf /home/linuxbrew
+
+pushd /home/runner || exit
+rm -rf .rustup .cargo .dotnet
+
+pushd /usr/local || exit
+rm -rf aws-* julia* lib/android
+popd || exit
+
+pushd /usr/local/bin || exit
+rm -rf azcopy cmake-gui helm minikube kustomize packer pulumi*
+popd || exit
+
+pushd /usr/local/share || exit
+rm -rf chromium edge-driver chromedriver-* gecko_driver powershell vcpkg
+popd || exit
+
