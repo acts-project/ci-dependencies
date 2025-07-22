@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 # /// script
+# requires-python = ">= 3.10"
 # dependencies = [
 #   "rich",
 #   "typer",
-#   "jinja2"
+#   "jinja2",
+#   "pydantic"
 # ]
 # ///
 
@@ -16,16 +18,31 @@ from rich.syntax import Syntax
 from rich.panel import Panel
 import json
 from jinja2 import Template
-from typing import Annotated
+from typing import Annotated, Any
+import subprocess
+from pydantic import BaseModel
 
 DOCKERFILE_TEMPLATE = r"""
 
 # Build the final image using base image
-FROM {{ base_image }}
 
-{% for name, full_name, url in layers -%}
-COPY --from={{ url }} /spack /spack
+# Grouped downloads of dependencies by root spec
+{% for block in spec_blocks %}
+{% set root = block[-1] -%}
+# for {{ root.name }}-{{ root.hash }}
+FROM {{ base_image }} AS stage-{{ root.name }}-{{ root.hash }}
+{%- for spec in block %}
+COPY --from={{ spec.full_url(oci_url) }} /spack /spack
+{%- endfor %}
 {% endfor %}
+
+# Assemble stages into final image
+FROM {{ base_image }}
+{% for block in spec_blocks %}
+{% set root = block[-1] -%}
+COPY --from=stage-{{ root.name }}-{{ root.hash }} /spack /spack
+{%- endfor %}
+
 
 RUN <<EOT bash
 set -eux
@@ -111,6 +128,65 @@ app = typer.Typer()
 console = Console()
 
 
+def manifest_exists(url: str):
+    proc = subprocess.run(["docker", "manifest", "inspect", url], capture_output=True)
+    return proc.returncode == 0
+
+
+class Spec(BaseModel):
+    name: str
+    version: str
+    hash: str
+
+    class Dependency(BaseModel):
+        name: str
+        hash: str
+
+        class Parameters(BaseModel):
+            deptypes: list[str]
+
+        parameters: Parameters
+
+        @property
+        def is_build_only(self) -> bool:
+            return self.parameters.deptypes == ["build"]
+
+    dependencies: list[Dependency] | None = None
+
+    class External(BaseModel):
+        path: str
+
+    external: External | None = None
+
+    @property
+    def is_external(self) -> bool:
+        return self.external is not None
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.name}-{self.version}-{self.hash}"
+
+    def full_url(self, oci_url: str) -> str:
+        return f"{oci_url}:{self.full_name}.spack"
+
+    @property
+    def markup(self) -> str:
+        return f"{self.hash[:7]} [bold]{self.name}[cyan]@{self.version}[/cyan][/bold]"
+
+    @property
+    def unformatted(self) -> str:
+        return f"{self.hash[:7]} {self.name}@{self.version}"
+
+    def oci_url_markup(self, oci_url: str):
+        return (
+            f"{' '*4} ~> [italic]{oci_url}:[/italic][bold]{self.name}[/bold]-[cyan]{self.version}[/cyan]-[bold]{self.hash}[/bold][italic].spack[/italic]",
+        )
+
+    # @staticmethod
+    # def from_dict(info: dict[str, Any]) -> "Spec":
+    #     return Spec(name=info["name"], version=info["version"], hash=info["hash"])
+
+
 @app.command()
 def main(
     lockfile_path: Annotated[
@@ -122,15 +198,15 @@ def main(
             file_okay=True,
         ),
     ],
-    output: Annotated[
-        Path | None,
-        typer.Option("-o", "--output", help="Output Dockerfile to this path"),
-    ] = None,
     base_image: Annotated[
-        str | None,
+        str,
         typer.Option(
             help="Base image to use. If not provided, will use the last layer as base image"
         ),
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option("-o", "--output", help="Output Dockerfile to this path"),
     ] = None,
     oci_url: Annotated[
         str,
@@ -147,30 +223,51 @@ def main(
     with lockfile_path.open("r") as f:
         lockfile = json.load(f)
 
-    layers = []
+    layers: list[Spec] = []
+
+    def process_spec(spec_info: dict[str, Any]) -> Spec:
+        spec = Spec(
+            name=spec_info["name"], version=spec_info["version"], hash=spec_info["hash"]
+        )
+        return spec
+
+    concrete_specs = {
+        h: Spec.model_validate(v) for h, v in lockfile["concrete_specs"].items()
+    }
+
+    assigned_specs: set[str] = set()
+
+    spec_blocks: list[Spec] = []
 
     for root in lockfile["roots"]:
-        root_hash = root["hash"]
-        spec = lockfile["concrete_specs"][root_hash]
-        name = spec["name"]
-        version = spec["version"]
-        console.print(
-            f"{root_hash[:7]} [bold]{spec['name']}[cyan]@{spec['version']}[/cyan][/bold]"
-        )
-        console.print(
-            f"{' '*4} ~> [italic]{oci_url}:[/italic][bold]{name}[/bold]-[cyan]{version}[/cyan]-[bold]{root_hash}[/bold][italic].spack[/italic]",
-            highlight=False,
-        )
+        spec = concrete_specs[root["hash"]]
+        # spec = process_spec(lockfile["concrete_specs"][root["hash"]])
+        console.print(spec.markup)
 
-        full_name = f"{name}-{version}-{root_hash}"
+        block: list[Spec] = []
 
-        full_url = f"{oci_url}:{full_name}.spack"
-        layers.append((name, full_name, full_url))
+        for dep in spec.dependencies:
+            full_dep = concrete_specs[dep.hash]
+            if dep.is_build_only or full_dep.is_external:
+                continue
 
-    console.print()
+            already_assigned = dep.hash in assigned_specs
 
-    if base_image is None:
-        base_image = layers[-1][-1]
+            if already_assigned:
+                console.print(
+                    f"~> [bright_black italic]{full_dep.unformatted}[/bright_black italic]",
+                    highlight=False,
+                )
+            else:
+                console.print(f"~> {full_dep.markup}", highlight=False)
+                assigned_specs.add(dep.hash)
+                block.append(full_dep)
+
+        block.append(spec)
+
+        spec_blocks.append(block)
+
+        console.print()
 
     template = Template(DOCKERFILE_TEMPLATE)
 
@@ -186,8 +283,6 @@ def main(
         else:
             lines.append(f"    {line} \\\\")
 
-    # preparation_script = "\n".join(lines)
-
     preparation_script = preparation_script.replace("\\", "\\\\").replace("$", r"\$")
 
     by_package = {v["name"]: v for _, v in lockfile["concrete_specs"].items()}
@@ -195,11 +290,15 @@ def main(
     by_package.pop("git-lfs")
 
     dockerfile = template.render(
-        layers=layers,
         base_image=base_image,
         preparation_script=preparation_script,
         specs=by_package,
+        oci_url=oci_url,
+        spec_blocks=spec_blocks,
     )
+
+    if dockerfile is None:
+        raise RuntimeError("Failed to render dockerfile template")
 
     if verbose:
         console.print(Panel(Syntax(dockerfile, "dockerfile"), title="Dockerfile"))
