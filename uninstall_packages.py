@@ -20,11 +20,12 @@ packages = (
 
 def proc(line):
     print(f"{line=}")
-    if "\t" in line:
-        size, name = line.split("\t")
-        return int(size), name.strip()
+    size, name = line.split("\t")
+    if len(size) > 0:
+        size = int(size)
     else:
-        return 0, line.strip()
+        size = 0
+    return size, name.strip()
 
 
 packages = [proc(line) for line in packages]
