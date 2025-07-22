@@ -62,7 +62,7 @@ jobs:
           echo "Listing 25 largest packages"
           dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 25
           echo "Removing large packages"
-          ./uninstall_packages.sh
+          ./uninstall_packages.py
           df -h
 
       - name: Setup Xcode version
