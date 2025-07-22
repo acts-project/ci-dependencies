@@ -75,7 +75,7 @@ spack -e . find -c
 end_section
 
 echo "+ Spack build"
-args="--no-check-signature --show-log-on-error"
+args="--no-check-signature --show-log-on-error --concurrent-packages 8"
 if [ -n "${FAIL_FAST:-}" ]; then
   args="$args --fail-fast"
 fi
