@@ -26,6 +26,7 @@ DOCKERFILE_TEMPLATE = r"""
 
 # Build the final image using base image
 
+{% if flatten %}
 # Grouped downloads of dependencies by root spec
 {% for block in spec_blocks %}
 {% set root = block[-1] -%}
@@ -42,6 +43,17 @@ FROM {{ base_image }}
 {% set root = block[-1] -%}
 COPY --from=stage-{{ root.name }}-{{ root.hash }} /spack /spack
 {%- endfor %}
+
+{% else %}
+
+FROM {{ base_image }}
+{% for block in spec_blocks %}
+{% set root = block[-1] -%}
+COPY --from={{ root.full_url(oci_url) }} /spack /spack
+{%- endfor %}
+
+{% endif %}
+
 
 
 RUN <<EOT bash
@@ -215,6 +227,7 @@ def main(
         ),
     ] = "ghcr.io/acts-project/spack-buildcache",
     verbose: bool = False,
+    flatten: bool = False,
 ):
     if not lockfile_path.exists():
         print(f"Lockfile {lockfile_path} does not exist")
@@ -237,31 +250,31 @@ def main(
 
     assigned_specs: set[str] = set()
 
-    spec_blocks: list[Spec] = []
+    spec_blocks: list[list[Spec]] = []
 
     for root in lockfile["roots"]:
         spec = concrete_specs[root["hash"]]
-        # spec = process_spec(lockfile["concrete_specs"][root["hash"]])
         console.print(spec.markup)
 
         block: list[Spec] = []
 
-        for dep in spec.dependencies:
-            full_dep = concrete_specs[dep.hash]
-            if dep.is_build_only or full_dep.is_external:
-                continue
+        if flatten:
+            for dep in spec.dependencies:
+                full_dep = concrete_specs[dep.hash]
+                if dep.is_build_only or full_dep.is_external:
+                    continue
 
-            already_assigned = dep.hash in assigned_specs
+                already_assigned = dep.hash in assigned_specs
 
-            if already_assigned:
-                console.print(
-                    f"~> [bright_black italic]{full_dep.unformatted}[/bright_black italic]",
-                    highlight=False,
-                )
-            else:
-                console.print(f"~> {full_dep.markup}", highlight=False)
-                assigned_specs.add(dep.hash)
-                block.append(full_dep)
+                if already_assigned:
+                    console.print(
+                        f"~> [bright_black italic]{full_dep.unformatted}[/bright_black italic]",
+                        highlight=False,
+                    )
+                else:
+                    console.print(f"~> {full_dep.markup}", highlight=False)
+                    assigned_specs.add(dep.hash)
+                    block.append(full_dep)
 
         block.append(spec)
 
@@ -295,6 +308,7 @@ def main(
         specs=by_package,
         oci_url=oci_url,
         spec_blocks=spec_blocks,
+        flatten=flatten,
     )
 
     if dockerfile is None:
