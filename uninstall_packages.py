@@ -2,8 +2,6 @@
 
 import subprocess
 import re
-import shutil
-from pathlib import Path
 from glob import glob
 
 packages = (
@@ -19,7 +17,6 @@ packages = (
 
 
 def proc(line):
-    print(f"{line=}")
     size, name = line.split("\t")
     if len(size) > 0:
         size = int(size)
@@ -30,9 +27,10 @@ def proc(line):
 
 packages = [proc(line) for line in packages]
 packages.sort(key=lambda pkg: pkg[0], reverse=True)
-print("Top 25 heaviest packages:")
-for _, (size, pkg) in zip(range(25), packages):
-    print("-", pkg, f"{size/1e3}M")
+num = 50
+print("Top", num, "heaviest packages:")
+for _, (size, pkg) in zip(range(num), packages):
+    print("-", pkg, f"{size/1e6}G")
 
 packages_to_remove = []
 remove_patterns = [
@@ -44,6 +42,7 @@ remove_patterns = [
     "^powershell$",
     "mono-devel",
     "^temurin.*",
+    "^mysql-server-core.*",
 ]
 
 for _, pkg in packages:
@@ -67,8 +66,8 @@ if len(packages_to_remove) > 0:
         check=True,
     )
 
-# subprocess.run(["sudo", "apt-get", "autoremove", "-y"], check=True)
-# subprocess.run(["sudo", "apt-get", "clean"], check=True)
+subprocess.run(["sudo", "apt-get", "autoremove", "-y"], check=True)
+subprocess.run(["sudo", "apt-get", "clean"], check=True)
 
 extra_files = [
     "/usr/share/dotnet/" "/home/packer",
@@ -97,10 +96,5 @@ extra_files = [
 print("Extra files to remove:")
 for extra in extra_files:
     for m in glob(extra):
-        m = Path(m)
-        if m.is_file():
-            print("Unlinking", m)
-            m.unlink()
-        elif m.is_dir():
-            print("Removing tree under", m)
-            shutil.rmtree(m)
+        print("Removing", m)
+        subprocess.run(["sudo", "rm", "-rf", m])
