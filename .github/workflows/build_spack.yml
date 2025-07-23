@@ -18,11 +18,6 @@ jobs:
       matrix:
         include:
 
-         - os: macos-14
-           xcode: "16.2.0"
-           compiler: "apple-clang@16.0.0"
-           default: true
-
          - os: macos-15
            xcode: "16.2.0"
            compiler: "apple-clang@16.0.0"
@@ -57,11 +52,6 @@ jobs:
             compiler: gcc@13.3.0
             os: ubuntu-latest
             default: true
-
-          - image: ghcr.io/acts-project/ubuntu2404:81
-            compiler: llvm@18.1.3
-            os: ubuntu-latest
-            default: false
 
           - image: ghcr.io/acts-project/ubuntu2404_clang19:81
             compiler: llvm@19.1.7
