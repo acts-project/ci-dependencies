@@ -10,7 +10,7 @@ spack:
     - podio@1.3
     - root@6.34.08 -aqua -opengl
     - dd4hep@1.32 +xercesc +edm4hep +hepmc3
-    - geomodel@6.15.0 +geomodelg4
+    - geomodel@6.10.0 +geomodelg4
     - python@3.13.2
     - py-pybind11 @2.13.6
     - py-pip
@@ -24,7 +24,7 @@ spack:
     - zlib-ng
     - bzip2
 
-    - pythia8@8.313
+    - pythia8@8.313 -hepmc +hepmc3
     - geant4@11.3.2 -data
     - fastjet@3.4.3 plugins=cxx
 
@@ -33,7 +33,9 @@ spack:
       target:
       - aarch64
       - x86_64
-      variants: cxxstd=20 build_type=Release
+      variants: cxxstd=20 build_type=Release 
+      require: 
+        - "%gcc@14"
     mesa:
       buildable: false
 
