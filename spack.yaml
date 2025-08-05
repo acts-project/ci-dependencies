@@ -1,3 +1,4 @@
+# IMPORTANT: concretize with --deprecated or it will not work
 spack:
   specs:
     - boost@1.77.0 +program_options +test +json # first version to support cxxstd=20
@@ -11,7 +12,7 @@ spack:
     - podio@0.17.4
     - root@6.28.04 -aqua -opengl -x ^libpng+pic 
     - dd4hep@1.26 +xercesc +edm4hep +hepmc3
-    - geomodel@6.3.0 +geomodelg4
+    - geomodel@6.8.0 +geomodelg4
     - python@3.9
     - py-pybind11 @2.13.6
     - py-pip
@@ -35,6 +36,7 @@ spack:
       - aarch64
       - x86_64
       variants: cxxstd=20 build_type=Release
+      require: "%gcc@11"
     mesa:
       buildable: false
 
