@@ -8,11 +8,11 @@ spack:
     - intel-tbb@2022.0.0
     - nlohmann-json@3.11.3
     - podio@1.3
-    - root@6.34.08 -aqua -opengl
-    - dd4hep@1.32 +xercesc +edm4hep +hepmc3
+    - root@6.36.02 -aqua -opengl
+    - dd4hep@1.32.1 +xercesc +edm4hep +hepmc3
     - geomodel@6.15.0 +geomodelg4
-    - python@3.13.2
-    - py-pybind11 @2.13.6
+    - python@3.13.5
+    - py-pybind11 @3.0.0
     - py-pip
     - py-jinja2 # for edm4hep + podio
     - py-pyyaml # for edm4hep + podio
@@ -26,7 +26,7 @@ spack:
 
     - pythia8@8.313 -hepmc +hepmc3
     - geant4@11.3.2 -data
-    - fastjet@3.4.3 plugins=cxx
+    - fastjet@3.5.0 plugins=cxx
 
   packages:
     all:
