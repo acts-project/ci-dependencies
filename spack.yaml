@@ -4,7 +4,7 @@ spack:
     - cmake@3.31.6
     - edm4hep@0.99.2
     - eigen@3.4.0
-    - git-lfs@3.5.1
+    - git-lfs@3.7.0
     - intel-tbb@2022.0.0
     - nlohmann-json@3.11.3
     - podio@1.3
