@@ -1,7 +1,7 @@
 spack:
   specs:
     - boost@1.88.0 +program_options +test +json +graph +filesystem
-    - cmake@3.31.6
+    - cmake@3.31.8
     - edm4hep@0.99.2
     - eigen@3.4.0
     - git-lfs@3.7.0
