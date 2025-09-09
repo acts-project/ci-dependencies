@@ -258,6 +258,27 @@ def select(
 
         canonical_path = Path("/Applications/Xcode.app")
 
+        # Always remove canonical path if it exists (could be missed by discovery)
+        if canonical_path.exists() and canonical_path != selected.path:
+            if dry_run:
+                if canonical_path.is_symlink():
+                    typer.echo(f"[DRY RUN] Would remove canonical symlink {canonical_path}")
+                else:
+                    typer.echo(f"[DRY RUN] Would remove canonical path {canonical_path}")
+            else:
+                if canonical_path.is_symlink():
+                    typer.echo(f"Removing canonical symlink {canonical_path}...")
+                    try:
+                        canonical_path.unlink()
+                    except Exception as e:
+                        typer.echo(f"Warning: Failed to remove canonical symlink {canonical_path}: {e}", err=True)
+                else:
+                    typer.echo(f"Removing canonical path {canonical_path}...")
+                    try:
+                        shutil.rmtree(canonical_path)
+                    except Exception as e:
+                        typer.echo(f"Warning: Failed to remove canonical path {canonical_path}: {e}", err=True)
+
         # Remove other Xcode versions
         for app in xcode_apps:
             if app.path != selected.path:
@@ -293,8 +314,13 @@ def select(
                 try:
                     if canonical_path.exists():
                         typer.echo(f"ERROR: {canonical_path} already exists after cleanup!", err=True)
+                        typer.echo(f"  exists(): {canonical_path.exists()}")
+                        typer.echo(f"  is_symlink(): {canonical_path.is_symlink()}")
+                        if canonical_path.is_symlink():
+                            typer.echo(f"  symlink target: {canonical_path.readlink()}")
                         raise typer.Exit(1)
                     
+                    typer.echo(f"Creating symlink: {canonical_path} -> {selected.path}")
                     canonical_path.symlink_to(selected.path)
                     typer.echo("✅ Cleanup complete!")
                 except Exception as e:
