@@ -254,87 +254,49 @@ def select(
                 raise typer.Exit(1)
 
     if cleanup:
-        typer.echo("🚨 Starting cleanup process...")
+        typer.echo("🔧 Ensuring canonical path points to selected Xcode...")
 
         canonical_path = Path("/Applications/Xcode.app")
 
-        # Always remove canonical path if it exists (could be missed by discovery)
-        if canonical_path.exists() and canonical_path != selected.path:
-            if dry_run:
-                if canonical_path.is_symlink():
-                    typer.echo(f"[DRY RUN] Would remove canonical symlink {canonical_path}")
+        # Check if canonical path already points to the selected Xcode
+        if canonical_path.exists():
+            if canonical_path.is_symlink():
+                current_target = canonical_path.resolve()
+                if current_target == selected.path:
+                    if dry_run:
+                        typer.echo("[DRY RUN] Canonical path already points to selected Xcode")
+                    else:
+                        typer.echo("✅ Canonical path already points to selected Xcode")
                 else:
-                    typer.echo(f"[DRY RUN] Would remove canonical path {canonical_path}")
-            else:
-                if canonical_path.is_symlink():
-                    typer.echo(f"Removing canonical symlink {canonical_path}...")
-                    try:
+                    # Remove existing symlink and create new one
+                    if dry_run:
+                        typer.echo(f"[DRY RUN] Would remove existing symlink {canonical_path} -> {current_target}")
+                        typer.echo(f"[DRY RUN] Would create symlink {canonical_path} -> {selected.path}")
+                    else:
+                        typer.echo(f"Removing existing symlink {canonical_path} -> {current_target}")
                         canonical_path.unlink()
-                    except Exception as e:
-                        typer.echo(f"Warning: Failed to remove canonical symlink {canonical_path}: {e}", err=True)
-                else:
-                    typer.echo(f"Removing canonical path {canonical_path}...")
-                    try:
-                        shutil.rmtree(canonical_path)
-                    except Exception as e:
-                        typer.echo(f"Warning: Failed to remove canonical path {canonical_path}: {e}", err=True)
-
-        # Remove other Xcode versions
-        for app in xcode_apps:
-            if app.path != selected.path:
-                if dry_run:
-                    if app.path.is_symlink():
-                        typer.echo(f"[DRY RUN] Would remove symlink {app.path}")
+                        typer.echo(f"Creating symlink {canonical_path} -> {selected.path}")
+                        canonical_path.symlink_to(selected.path)
+                        typer.echo("✅ Canonical path updated!")
+            else:
+                # Canonical path exists but is not a symlink
+                if canonical_path.resolve() == selected.path:
+                    if dry_run:
+                        typer.echo("[DRY RUN] Selected Xcode is already at canonical location")
                     else:
-                        typer.echo(f"[DRY RUN] Would remove {app.path}")
+                        typer.echo("✅ Selected Xcode is already at canonical location")
                 else:
-                    if app.path.is_symlink():
-                        typer.echo(f"Removing symlink {app.path}...")
-                        try:
-                            app.path.unlink()
-                        except Exception as e:
-                            typer.echo(
-                                f"Warning: Failed to remove symlink {app.path}: {e}", err=True
-                            )
-                    else:
-                        typer.echo(f"Removing {app.path}...")
-                        try:
-                            shutil.rmtree(app.path)
-                        except Exception as e:
-                            typer.echo(
-                                f"Warning: Failed to remove {app.path}: {e}", err=True
-                            )
-
-        # Create symlink to selected Xcode at canonical location if needed
-        if selected.path != canonical_path:
+                    typer.echo(f"ERROR: {canonical_path} exists but is not a symlink and not the selected Xcode!", err=True)
+                    typer.echo("Cannot safely replace it. Please remove it manually first.", err=True)
+                    raise typer.Exit(1)
+        else:
+            # Create new symlink
             if dry_run:
                 typer.echo(f"[DRY RUN] Would create symlink {canonical_path} -> {selected.path}")
             else:
-                typer.echo(f"Creating symlink {canonical_path} -> {selected.path}...")
-                try:
-                    if canonical_path.exists():
-                        typer.echo(f"ERROR: {canonical_path} already exists after cleanup!", err=True)
-                        typer.echo(f"  exists(): {canonical_path.exists()}")
-                        typer.echo(f"  is_symlink(): {canonical_path.is_symlink()}")
-                        if canonical_path.is_symlink():
-                            typer.echo(f"  symlink target: {canonical_path.readlink()}")
-                        raise typer.Exit(1)
-                    
-                    typer.echo(f"Creating symlink: {canonical_path} -> {selected.path}")
-                    canonical_path.symlink_to(selected.path)
-                    typer.echo("✅ Cleanup complete!")
-                except Exception as e:
-                    typer.echo(
-                        f"Failed to create symlink at canonical location: {e}", err=True
-                    )
-                    raise typer.Exit(1)
-        else:
-            if dry_run:
-                typer.echo("[DRY RUN] Selected Xcode is already at canonical location")
-            else:
-                typer.echo(
-                    "✅ Cleanup complete! (Selected Xcode already at canonical location)"
-                )
+                typer.echo(f"Creating symlink {canonical_path} -> {selected.path}")
+                canonical_path.symlink_to(selected.path)
+                typer.echo("✅ Canonical path created!")
         
         # Set as active Xcode after cleanup
         developer_dir = final_path / "Contents" / "Developer"
