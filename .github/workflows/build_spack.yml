@@ -18,13 +18,18 @@ jobs:
       matrix:
         include:
 
-         # - os: macos-15
-         #   xcode: "16.2.0"
-         #   compiler: "apple-clang@16.0.0"
-         #   default: true
+         - os: macos-15
+           xcode: "16.2.0"
+           compiler: "apple-clang@16.0.0"
+           default: true
 
          - os: macos-15
            xcode: "16.4.0"
+           compiler: "apple-clang@17.0.0"
+           default: true
+
+         - os: macos-15
+           xcode: "26.0.0"
            compiler: "apple-clang@17.0.0"
            default: true
 
