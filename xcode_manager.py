@@ -34,13 +34,22 @@ def find_installed_xcode_apps() -> List[XcodeVersion]:
         return []
 
     xcode_apps = []
+    seen_targets = set()  # Track resolved paths to avoid duplicates
     xcode_pattern = re.compile(r"^Xcode.*\.app$", re.IGNORECASE)
 
     for app_path in apps_dir.iterdir():
         if not app_path.is_dir() or not xcode_pattern.match(app_path.name):
             continue
 
-        info_plist = app_path / "Contents" / "Info.plist"
+        # Resolve symlinks to get the actual target
+        resolved_path = app_path.resolve()
+        
+        # Skip if we've already seen this target
+        if resolved_path in seen_targets:
+            continue
+        seen_targets.add(resolved_path)
+
+        info_plist = resolved_path / "Contents" / "Info.plist"
         if not info_plist.exists():
             continue
 
@@ -54,16 +63,19 @@ def find_installed_xcode_apps() -> List[XcodeVersion]:
             if not bundle_version:
                 continue
 
-            # Check if it's a beta version
+            # Check if it's a beta version (check both original and resolved paths)
             is_beta = (
-                "beta" in bundle_version.lower() or "beta" in app_path.name.lower()
+                "beta" in bundle_version.lower() 
+                or "beta" in app_path.name.lower()
+                or "beta" in resolved_path.name.lower()
             )
 
+            # Use the resolved path as the canonical path
             xcode_apps.append(
                 XcodeVersion(
                     version=bundle_version,
                     build=build_version,
-                    path=app_path,
+                    path=resolved_path,
                     is_beta=is_beta,
                 )
             )
