@@ -28,6 +28,11 @@ spack:
     - geant4@11.3.2 -data
     - fastjet@3.5.0 plugins=cxx
 
+    # v1.19 and v1.20: abseil sees inconsistent install library names -> configuration fails
+    # v1.21 does not work on AMD due to unsupported instructions vpdpbusds
+    # We're stuck on v1.18.1 for now
+    - py-onnxruntime@1.18.1 dynamic_cpu_arch=NOAVX
+
   packages:
     all:
       target:
