@@ -63,11 +63,23 @@ jobs:
           ./uninstall_packages.py
           df -h
 
+      # - name: Setup Xcode version
+      #   if: startsWith(inputs.os, 'macos')
+      #   uses: maxim-lobanov/setup-xcode@v1
+      #   with:
+      #     xcode-version: "${{ inputs.xcode }}"
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Setup Xcode version
         if: startsWith(inputs.os, 'macos')
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: "${{ inputs.xcode }}"
+        run: |
+          uv run xcode_manager.py list-versions
+          uv run xcode_manager.py select ${{ inputs.xcode }} --cleanup
+          # Cross check, other xcodes should be gone now
+          uv run xcode_manager.py list-versions
+
 
       - name: Run spack build (container)
         if: "${{ inputs.image != '' }}"
@@ -115,10 +127,6 @@ jobs:
           echo "TARGET_TRIPLET=${TARGET_TRIPLET}" >> "$GITHUB_OUTPUT"
           echo "TARGET_ARCH=${TARGET_ARCH}" >> "$GITHUB_OUTPUT"
           echo "TARGET_TRIPLET_SLUG=${TARGET_TRIPLET}" | sed 's/@/-/g' >> "$GITHUB_OUTPUT"
-
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v5
-
 
       - name: Derive base image
         shell: bash

@@ -24,9 +24,14 @@ jobs:
            default: true
 
          - os: macos-15
-           xcode: "16.3.0"
+           xcode: "16.4.0"
            compiler: "apple-clang@17.0.0"
            default: true
+
+         # - os: macos-15
+         #   xcode: "26.0.0"
+         #   compiler: "apple-clang@17.0.0"
+         #   default: false
 
     uses: ./.github/workflows/spack.yml
     with:
