@@ -44,8 +44,6 @@ end_section
 
 echo "Spack version: $(spack --version)"
 
-SPACK_ENVIRONMENT_FILE=${SPACK_ENVIRONMENT_FILE:-spack.yaml}
-
 start_section "Create environment"
 spack env create -d . "$SCRIPT_DIR"/spack.yaml 
 # spack -e . mirror set --autopush acts-spack-buildcache
