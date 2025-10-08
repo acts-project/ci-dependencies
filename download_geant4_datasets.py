@@ -9,6 +9,7 @@
 # ///
 
 import asyncio
+import concurrent.futures
 import hashlib
 import shutil
 import subprocess
@@ -73,13 +74,15 @@ def parse_datasets(config_path: Path) -> list[dict]:
             continue
         parts = entry.split("|")
         if len(parts) >= 5:
-            datasets.append({
-                "name": parts[0],
-                "envvar": parts[1],
-                "path": parts[2],
-                "filename": parts[3],
-                "md5": parts[4],
-            })
+            datasets.append(
+                {
+                    "name": parts[0],
+                    "envvar": parts[1],
+                    "path": parts[2],
+                    "filename": parts[3],
+                    "md5": parts[4],
+                }
+            )
 
     return datasets
 
@@ -110,12 +113,41 @@ def verify_md5(filepath: Path, expected_md5: str) -> bool:
     return md5.hexdigest() == expected_md5
 
 
+def extract_and_install(
+    tarball_path: Path, temp_dir: Path, dest_dir: Path
+) -> tuple[bool, str]:
+    """Extract tarball and install to final location (runs in process pool)."""
+    try:
+        # Extract
+        with tarfile.open(tarball_path, "r:gz") as tar:
+            tar.extractall(temp_dir, filter="data")
+
+        # Install to final location
+        dataset_dir_name = dest_dir.name
+        src_dir = temp_dir / dataset_dir_name
+
+        dest_dir.parent.mkdir(parents=True, exist_ok=True)
+
+        if dest_dir.exists():
+            shutil.rmtree(dest_dir)
+
+        shutil.move(str(src_dir), str(dest_dir))
+
+        # Clean up tarball
+        tarball_path.unlink()
+
+        return True, f"Successfully installed {dataset_dir_name}"
+    except Exception as e:
+        return False, f"Failed to extract/install: {e}"
+
+
 async def download_dataset(
     client: httpx.AsyncClient,
     dataset: dict,
     base_url: str,
     temp_dir: Path,
     progress: Progress,
+    executor: concurrent.futures.ProcessPoolExecutor,
 ) -> tuple[bool, str]:
     """Download and verify a single dataset."""
     filename = dataset["filename"]
@@ -138,34 +170,37 @@ async def download_dataset(
                     downloaded += len(chunk)
                     progress.update(task_id, completed=downloaded)
 
-        # Verify MD5
+        # Verify MD5 in process pool (non-blocking)
         progress.update(task_id, description=f"[yellow]{filename} (verifying)")
-        if not verify_md5(dest_path, dataset["md5"]):
+        loop = asyncio.get_event_loop()
+        md5_valid = await loop.run_in_executor(
+            executor,
+            verify_md5,
+            dest_path,
+            dataset["md5"],
+        )
+
+        if not md5_valid:
             progress.update(task_id, description=f"[red]{filename} (MD5 mismatch)")
             return False, f"MD5 mismatch for {filename}"
 
-        # Extract
+        # Extract and install in process pool (non-blocking)
         progress.update(task_id, description=f"[yellow]{filename} (extracting)")
-        with tarfile.open(dest_path, "r:gz") as tar:
-            tar.extractall(temp_dir, filter="data")
-
-        # Install to final location
-        dataset_dir_name = Path(dataset["path"]).name
-        src_dir = temp_dir / dataset_dir_name
         dest_dir = Path(dataset["path"])
+        success, msg = await loop.run_in_executor(
+            executor,
+            extract_and_install,
+            dest_path,
+            temp_dir,
+            dest_dir,
+        )
 
-        dest_dir.parent.mkdir(parents=True, exist_ok=True)
-
-        if dest_dir.exists():
-            progress.update(task_id, description=f"[green]{filename} (already exists, skipping)")
-        else:
-            shutil.move(str(src_dir), str(dest_dir))
+        if success:
             progress.update(task_id, description=f"[green]{filename} (installed)")
-
-        # Clean up tarball
-        dest_path.unlink()
-
-        return True, f"Successfully installed {dataset['name']}"
+            return True, f"Successfully installed {dataset['name']}"
+        else:
+            progress.update(task_id, description=f"[red]{filename} (failed)")
+            return False, msg
 
     except Exception as e:
         progress.update(task_id, description=f"[red]{filename} (failed)")
@@ -178,19 +213,23 @@ async def download_all_datasets(
     temp_dir: Path,
     max_concurrent: int,
     dry_run: bool = False,
+    force: bool = False,
 ) -> None:
     """Download all datasets with limited concurrency."""
     # Filter out already installed datasets
-    datasets_to_install = [
-        ds for ds in datasets if not Path(ds["path"]).exists()
-    ]
+    if force:
+        datasets_to_install = datasets
+    else:
+        datasets_to_install = [ds for ds in datasets if not Path(ds["path"]).exists()]
 
     if not datasets_to_install:
         console.print("[green]All datasets already installed[/green]")
         return
 
     if dry_run:
-        console.print(f"[yellow]DRY RUN: Would download {len(datasets_to_install)} datasets:[/yellow]")
+        console.print(
+            f"[yellow]DRY RUN: Would download {len(datasets_to_install)} datasets:[/yellow]"
+        )
         for ds in datasets_to_install:
             console.print(f"  [cyan]•[/cyan] {ds['name']} ({ds['filename']})")
             console.print(f"    URL: {base_url}/{ds['filename']}")
@@ -209,21 +248,23 @@ async def download_all_datasets(
         console=console,
     )
 
-    async with httpx.AsyncClient(timeout=1800.0) as client:
-        with progress:
-            # Use semaphore to limit concurrent downloads
-            semaphore = asyncio.Semaphore(max_concurrent)
+    # Use process pool for extraction
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        async with httpx.AsyncClient(timeout=1800.0) as client:
+            with progress:
+                # Use semaphore to limit concurrent downloads
+                semaphore = asyncio.Semaphore(max_concurrent)
 
-            async def bounded_download(dataset):
-                async with semaphore:
-                    return await download_dataset(
-                        client, dataset, base_url, temp_dir, progress
-                    )
+                async def bounded_download(dataset):
+                    async with semaphore:
+                        return await download_dataset(
+                            client, dataset, base_url, temp_dir, progress, executor
+                        )
 
-            results = await asyncio.gather(
-                *[bounded_download(ds) for ds in datasets_to_install],
-                return_exceptions=True,
-            )
+                results = await asyncio.gather(
+                    *[bounded_download(ds) for ds in datasets_to_install],
+                    return_exceptions=True,
+                )
 
     # Print summary
     console.print()
@@ -245,10 +286,21 @@ async def download_all_datasets(
 @app.command()
 def main(
     max_concurrent: Annotated[
-        int, typer.Option(help="Maximum concurrent downloads")
+        int, typer.Option("--jobs", "-j", help="Maximum concurrent downloads")
     ] = 4,
     dry_run: Annotated[
-        bool, typer.Option("--dry-run", help="Show what would be downloaded without actually downloading")
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="Show what would be downloaded without actually downloading",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Redownload and reinstall datasets even if they already exist",
+        ),
     ] = False,
     config: Annotated[
         Path | None, typer.Option("--config", help="Path to geant4-config script")
@@ -277,7 +329,11 @@ def main(
     # Create temp directory
     with tempfile.TemporaryDirectory(prefix="geant4-downloads-") as temp_dir:
         # Download datasets
-        asyncio.run(download_all_datasets(datasets, base_url, Path(temp_dir), max_concurrent, dry_run))
+        asyncio.run(
+            download_all_datasets(
+                datasets, base_url, Path(temp_dir), max_concurrent, dry_run, force
+            )
+        )
 
 
 if __name__ == "__main__":
