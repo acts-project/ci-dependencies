@@ -43,7 +43,7 @@ jobs:
       - name: Set up Spack
         uses: spack/setup-spack@v2
         with:
-          ref: releases/v1.0.2
+          ref: v1.0.2
 
       - name: Apply spack patches
         run: |
