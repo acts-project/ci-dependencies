@@ -1,7 +1,7 @@
 spack:
   specs:
     - boost@1.88.0 +program_options +test +json +graph +filesystem
-    - cmake@3.31.8
+    - cmake@3.31.9
     - edm4hep@0.99.2
     - eigen@3.4.0
     - git-lfs@3.7.0
@@ -11,7 +11,7 @@ spack:
     - root@6.36.02 -aqua -opengl
     - dd4hep@1.32.1 +xercesc +edm4hep +hepmc3
     - geomodel@6.15.0 +geomodelg4
-    - python@3.13.8
+    - python@3.14
     - py-pybind11 @3.0.0
     - py-pip
     - py-jinja2 # for edm4hep + podio
