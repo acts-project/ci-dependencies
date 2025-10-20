@@ -40,6 +40,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: rafalkk/remove-dockertag-action@v1
+        with:
+          tag_name: "compiler-wrapper-1.0-46lpvfsleqehuovwejystxp7uze2tuc4.spack"
+          github_token: "${{ secrets.GITHUB_TOKEN }}"
+      - uses: rafalkk/remove-dockertag-action@v1
+        with:
+          tag_name: "compiler-wrapper-1.0-7dx75jyegrx3xh5kh5kgj5kfh7azl7on.spack"
+          github_token: "${{ secrets.GITHUB_TOKEN }}"
+      - uses: rafalkk/remove-dockertag-action@v1
+        with:
+          tag_name: "compiler-wrapper-1.0-2nwk4yqb3bzs4se64ylxc7pithenbrs3.spack"
+          github_token: "${{ secrets.GITHUB_TOKEN }}"
+
       - name: Set up Spack
         uses: spack/setup-spack@v2
 
