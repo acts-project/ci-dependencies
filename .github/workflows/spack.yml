@@ -44,7 +44,7 @@ jobs:
         uses: spack/setup-spack@v2
         with:
           ref: develop
-          buildcache: false
+          buildcache: true
           color: true
           path: spack
 
