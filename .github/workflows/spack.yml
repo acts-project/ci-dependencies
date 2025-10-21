@@ -44,10 +44,9 @@ jobs:
         uses: spack/setup-spack@v2
         with:
           ref: develop
-          buildcache: true
+          buildcache: false
           color: true
           path: spack
-      - run: spack install python
 
       - name: Apply spack patches
         run: |
