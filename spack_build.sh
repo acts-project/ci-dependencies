@@ -47,7 +47,7 @@ echo "Spack version: $(spack --version)"
 start_section "Create environment"
 spack env create -d . "$SCRIPT_DIR"/spack.yaml
 spack env activate .
-spack buildcache migrate --unsigned --yes-to-all acts-spack-buildcache
+spack buildcache migrate --delete-existing --unsigned --yes-to-all acts-spack-buildcache
 end_section
 
 start_section "List visible compilers"
