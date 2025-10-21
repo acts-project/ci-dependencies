@@ -42,6 +42,11 @@ jobs:
 
       - name: Set up Spack
         uses: spack/setup-spack@v2
+        with:
+          ref: 81636b550f89807b03a16d847697d16115ea33ea # last commit known working commit before 9 Oct 2025
+          buildcache: true
+          color: true
+          path: spack
 
       - name: Apply spack patches
         run: |
