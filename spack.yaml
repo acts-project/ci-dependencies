@@ -47,7 +47,7 @@ spack:
 
   mirrors:
     acts-spack-buildcache:
-      url: oci://ghcr.io/acts-project/spack-buildcache
+      url: oci://ghcr.io/acts-project/spack-buildcache2
       signed: false
       access_pair:
         id_variable: GH_OCI_USER

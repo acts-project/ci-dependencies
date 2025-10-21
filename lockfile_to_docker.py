@@ -225,7 +225,7 @@ def main(
         typer.Option(
             help="OCI URL to use. If not provided, will use the default OCI URL"
         ),
-    ] = "ghcr.io/acts-project/spack-buildcache",
+    ] = "ghcr.io/acts-project/spack-buildcache2",
     verbose: bool = False,
     flatten: bool = False,
 ):
