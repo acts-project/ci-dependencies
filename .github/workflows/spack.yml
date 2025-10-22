@@ -42,11 +42,6 @@ jobs:
 
       - name: Set up Spack
         uses: spack/setup-spack@v2
-        with:
-          ref: develop
-          buildcache: true
-          color: true
-          path: spack
 
       - name: Apply spack patches
         run: |
