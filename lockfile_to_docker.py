@@ -300,7 +300,8 @@ def main(
 
     by_package = {v["name"]: v for _, v in lockfile["concrete_specs"].items()}
     by_package.pop("git")
-    by_package.pop("git-lfs")
+    if "git-lfs" in by_package:
+        by_package.pop("git-lfs")
 
     dockerfile = template.render(
         base_image=base_image,
