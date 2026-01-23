@@ -27,6 +27,8 @@ spack:
     - geant4@11.3.2 -data
     - fastjet@3.5.0 plugins=cxx
 
+    - onnxruntime-bin
+
   packages:
     all:
       target:
@@ -43,6 +45,9 @@ spack:
     install_tree:
       padded_length: 128
     connect_timeout: 60
+
+  repos:
+    acts: spack_repo/acts
 
   mirrors:
     acts-spack-buildcache:
