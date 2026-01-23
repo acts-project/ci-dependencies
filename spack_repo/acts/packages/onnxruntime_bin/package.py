@@ -78,19 +78,26 @@ class OnnxruntimeBin(Package):
     # version("1.22.2", tag="v1.22.2", commit="5630b081cd25e4eccc7516a652ff956e51676794")
     # Source versions are not used
 
-    with when("platform=linux"):
-        variant(
-            "gpu",
-            default=True,
-            description="Install with GPU support",
-        )
+    variant(
+        "gpu",
+        default=True,
+        when="platform=linux target=x86_64:",
+        description="Install with GPU support",
+    )
 
-    with when("platform=darwin"):
-        variant(
-            "gpu",
-            default=False,
-            description="Install with GPU support",
-        )
+    variant(
+        "gpu",
+        default=False,
+        when="platform=darwin",
+        description="Install with GPU support",
+    )
+
+    variant(
+        "gpu",
+        default=False,
+        when="platform=linux target=aarch64:",
+        description="Install with GPU support",
+    )
 
     # variant(
     #     "gpu",
@@ -101,6 +108,11 @@ class OnnxruntimeBin(Package):
 
     conflicts(
         "+gpu", when="platform=darwin", msg="GPU variant is not supported on macOS"
+    )
+    conflicts(
+        "+gpu",
+        when="platform=linux target=aarch64:",
+        msg="GPU variant is not supported on macOS",
     )
 
     _add_version(
