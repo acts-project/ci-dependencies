@@ -28,8 +28,6 @@ spack:
     - fastjet@3.5.0 plugins=cxx
 
     - onnxruntime-bin@1.21.0
-    - py-torch@2.9.1
-
   packages:
     all:
       target:
