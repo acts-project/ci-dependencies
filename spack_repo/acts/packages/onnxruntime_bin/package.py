@@ -42,7 +42,7 @@ def _add_version(
 
     resource(
         name=f"linux-aarch64-v{version}",
-        url="https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-linux-aarch64-{version}.tgz",
+        url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-linux-aarch64-{version}.tgz",
         sha256=sha256_linux_aarch64,
         when=f"@{version} ~gpu platform=linux target=aarch64:",
         destination="./",
