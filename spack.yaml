@@ -27,7 +27,7 @@ spack:
     - geant4@11.3.2 -data
     - fastjet@3.5.0 plugins=cxx
 
-    - onnxruntime-bin
+    - onnxruntime-bin@1.21.0
     - py-torch@2.9.1
 
   packages:
