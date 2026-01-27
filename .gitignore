@@ -3,4 +3,4 @@ local
 spack.lock
 /.env
 /.spack-env
-
+*.pyc
