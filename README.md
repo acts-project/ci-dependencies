@@ -1,50 +1,29 @@
-# ACTS super-project with dependencies
+# ACTS dependencies
 
-This repository contains instructions to build ACTS including all dependencies,
-except for common ones usually found in package managers.
+- If you're on **macOS** you need a fortran compiler: so `brew install gcc`
+- Install [spack](https://github.com/spack/spack/#installation) and source the setup script (`~/spack/share/spack/setup-env.sh`) so you have shell support
+- Clone the [acts-project/ci-dependencies](https://github.com/acts-project/ci-dependencies) repository
 
-To get started, clone this repository like:
+> [!IMPORTANT]
+> If you're on **macOS** you need a fortran compiler: so `brew install gcc` before proceeding.
 
-```bash
-git clone --recursive git@github.com:acts-project/ci-dependencies.git
-```
+- Go to the cloned dependencies repository
+    - Run `spack compiler find`. 
+      This populates spack's compiler packages with the externally found compilers.
+    - Run `spack env activate .`
+      This loads the repository as an [environment](https://spack.readthedocs.io/en/latest/environments.html) and allows you to perform local actions.
+    - Run `spack concretize -Uf`
+      This makes spack resolve all of the dependency packages and their various versions. This step can take a moment.
+    - Run `spack install`
+      This will actually perform the installaion!
 
-You can then run the main build script, where you can supply a custom build and install directory.
+The `spack.yaml` in this repository configures a binary cache that lives on GitHub. 
+Spack will attempt to find binary caches for the packages that it installs, 
+and this can significantly speed up the install process.
 
-```bash
-./build.sh [BUILD_DIR] [INSTALL_DIR] # both arguments are optional
-```
+> [!WARNING]
+> 🚨 **ROOT install issue on macOS**
+> - When you see ROOT building, abort! Then run `spack uninstall root` and then `spack install --no-cache root`. If you see a warning about some `._view` folder already existing, just delete that folder and try again!
+> - Once the ROOT build is completed, run `spack install`
 
-The build script will build ACTS (which you checked out as a submodule with the command above).
-The source code is found in `$REPOSITORY/acts`, and can be modified.
-
-> [!NOTE]
-> The script and CMake configuration will tell you about missing packages.
-> If you're just getting started, try running one of these one-liners depending on your operating system:
->
-> ### Ubuntu
->
-> ```bash
-> sudo apt-get install -y cmake build-essential libssl-dev zlib1g-dev libncurses5-dev libexpat-dev libxerces-c-dev rsync libfreetype-dev liblzma-dev liblz4-dev libx11-dev libxpm-dev libxft-dev libxext-dev libglu1-mesa-dev libxml2-dev git libzstd-dev
-> ```
->
-> ### AlmaLinux9
->
-> ```bash
-> sudo dnf group install -y "Development Tools" && sudo dnf install -y epel-release && sudo dnf install -y cmake  openssl-devel zlib-devel ncurses-devel expat-devel xerces-c-devel rsync freetype-devel xz-devel lz4-devel libX11-devel libXpm-devel libXft-devel libXext-devel mesa-libGLU-devel libxml2-devel git libzstd-devel
-> ```
->
-> ### macOS
->
-> 1. Install homebrew from <https://brew.sh>
->
-> ```bash
-> xcode-select --install
-> brew install cmake openssl@3 zlib zstd ncurses expat xerces-c rsync freetype xz lz4 libx11 libxml2 git"
-> ```
-
-If you want to run only the ACTS build, use
-
-```bash
-cmake --build $YOUR_BUILD_DIR --target acts
-```
+- To compile ACTS, you do `spack env activate $CI_DEPS` directory (wherever that `spack.yaml` file is / where you cloned this repository) and then run CMake as usual on an ACTS clone

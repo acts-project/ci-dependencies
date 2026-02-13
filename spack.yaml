@@ -2,13 +2,13 @@ spack:
   specs:
     - boost@1.89.0 +program_options +test +json +graph +filesystem
     - cmake@4.2.0
-    - edm4hep@0.99.4
+    - edm4hep@main
     - eigen@5.0.1
     - intel-tbb@2022.3.0
     - nlohmann-json@3.12.0
-    - podio@1.6
+    - podio@master
     - root@6.38.00 -aqua -opengl
-    - dd4hep@1.33 +xercesc +edm4hep +hepmc3
+    - dd4hep@master +xercesc +edm4hep +hepmc3
     - geomodel@6.22.0 +geomodelg4
     - python@3.14
     - py-pybind11 @3.0.1
