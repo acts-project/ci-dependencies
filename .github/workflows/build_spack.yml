@@ -38,6 +38,7 @@ jobs:
       os: ${{ matrix.os }}
       xcode: ${{ matrix.xcode }}
       compiler: ${{ matrix.compiler }}
+      cxxstd: ${{ matrix.cxxstd || '20' }}
       default: ${{ matrix.default }}
     secrets: inherit
 
@@ -58,8 +59,8 @@ jobs:
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang19:82
-            compiler: llvm@19.1.7
+          - image: ghcr.io/acts-project/ubuntu2404_clang22:82
+            compiler: llvm@22.0.0
             os: ubuntu-latest
             default: false
 
@@ -74,6 +75,7 @@ jobs:
       image: ${{ matrix.image }}
       compiler: ${{ matrix.compiler }}
       compiler_path: ${{ matrix.compiler_path }}
+      cxxstd: ${{ matrix.cxxstd || '20' }}
       default: ${{ matrix.default }}
     secrets: inherit
 

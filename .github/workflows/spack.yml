@@ -22,6 +22,10 @@ on:
         required: false
         type: string
         default: ""
+      cxxstd:
+        required: false
+        type: string
+        default: "20"
       default:
         required: false
         type: boolean
@@ -98,6 +102,7 @@ jobs:
             -e "SPACK_ROOT=/spack" \
             -e "COMPILER=${{ inputs.compiler }}" \
             -e "COMPILER_PATH=${{ inputs.compiler_path }}" \
+            -e "CXXSTD=${{ inputs.cxxstd }}" \
             -e "GH_OCI_USER=${{ github.actor }}" \
             -e "GH_OCI_TOKEN=${{ secrets.GITHUB_TOKEN }}" \
             -e "GITHUB_ENV=/github_env" \
@@ -110,6 +115,7 @@ jobs:
         if: "${{ inputs.image == '' }}"
         run: |
           export COMPILER=${{ inputs.compiler }}
+          export CXXSTD=${{ inputs.cxxstd }}
           export SPACK_ROOT=$(spack location -r)
           export COMPILER_PATH="${{ inputs.compiler_path }}"
           export GH_OCI_USER="${{ github.actor }}"
