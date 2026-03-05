@@ -69,6 +69,19 @@ jobs:
             os: ubuntu-24.04-arm
             default: false
 
+          - image: ghcr.io/acts-project/alma9-base:84
+            compiler: gcc@15.1.1
+            compiler_path: "/opt/rh/gcc-toolset-15/root"
+            os: ubuntu-latest
+            cxxstd: "23"
+            default: false
+
+          - image: ghcr.io/acts-project/ubuntu2404_clang22:84
+            compiler: llvm@22.0.0
+            os: ubuntu-latest
+            cxxstd: "23"
+            default: false
+
     uses: ./.github/workflows/spack.yml
     with:
       os: ${{ matrix.os }}
