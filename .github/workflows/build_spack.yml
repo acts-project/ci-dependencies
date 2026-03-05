@@ -48,23 +48,23 @@ jobs:
       matrix:
 
         include:
-          - image: ghcr.io/acts-project/alma9-base:82
+          - image: ghcr.io/acts-project/alma9-base:84
             compiler: gcc@14.2.1
             compiler_path: "/opt/rh/gcc-toolset-14/root"
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404:82
+          - image: ghcr.io/acts-project/ubuntu2404:84
             compiler: gcc@13.3.0
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang22:82
+          - image: ghcr.io/acts-project/ubuntu2404_clang22:84
             compiler: llvm@22.0.0
             os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404:82
+          - image: ghcr.io/acts-project/ubuntu2404:84
             compiler: gcc@13.3.0
             os: ubuntu-24.04-arm
             default: false
