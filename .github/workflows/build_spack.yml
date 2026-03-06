@@ -21,19 +21,16 @@ jobs:
          - os: macos-15
            xcode: "16.2.0"
            compiler: "apple-clang@16.0.0"
-           cxxstd: "20"
            default: true
 
          - os: macos-15
            xcode: "16.4.0"
            compiler: "apple-clang@17.0.0"
-           cxxstd: "20"
            default: true
 
          - os: macos-26
            xcode: "26.0"
            compiler: "apple-clang@17.0.0"
-           cxxstd: "20"
            default: false
 
     uses: ./.github/workflows/spack.yml
@@ -41,7 +38,6 @@ jobs:
       os: ${{ matrix.os }}
       xcode: ${{ matrix.xcode }}
       compiler: ${{ matrix.compiler }}
-      cxxstd: ${{ matrix.cxxstd }}
       default: ${{ matrix.default }}
     secrets: inherit
 
@@ -55,28 +51,21 @@ jobs:
             compiler: gcc@15.1.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
-            cxxstd: "20"
             default: true
 
           - image: ghcr.io/acts-project/ubuntu2404:84
             compiler: gcc@13.3.0
-            compiler_path: ""
             os: ubuntu-latest
-            cxxstd: "20"
             default: true
 
           - image: ghcr.io/acts-project/ubuntu2404_clang22:84
-            compiler: llvm@22.0.0
-            compiler_path: ""
+            compiler: llvm@22.1.1
             os: ubuntu-latest
-            cxxstd: "20"
             default: false
 
           - image: ghcr.io/acts-project/ubuntu2404:84
             compiler: gcc@13.3.0
-            compiler_path: ""
             os: ubuntu-24.04-arm
-            cxxstd: "20"
             default: false
 
           - image: ghcr.io/acts-project/alma9-base:84
@@ -87,8 +76,7 @@ jobs:
             default: false
 
           - image: ghcr.io/acts-project/ubuntu2404_clang22:84
-            compiler: llvm@22.0.0
-            compiler_path: ""
+            compiler: llvm@22.1.1
             os: ubuntu-latest
             cxxstd: "23"
             default: false
@@ -98,8 +86,8 @@ jobs:
       os: ${{ matrix.os }}
       image: ${{ matrix.image }}
       compiler: ${{ matrix.compiler }}
-      compiler_path: ${{ matrix.compiler_path }}
-      cxxstd: ${{ matrix.cxxstd }}
+      compiler_path: ${{ matrix.compiler_path || '' }}
+      cxxstd: ${{ matrix.cxxstd || '20' }}
       default: ${{ matrix.default }}
     secrets: inherit
 
