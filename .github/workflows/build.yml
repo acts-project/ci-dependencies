@@ -49,35 +49,35 @@ jobs:
       matrix:
 
         include:
-          - image: ghcr.io/acts-project/alma9-base:84
+          - image: ghcr.io/acts-project/alma9-base:85
             compiler: gcc@15.1.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404:84
+          - image: ghcr.io/acts-project/ubuntu2404:85
             compiler: gcc@13.3.0
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang22:84
+          - image: ghcr.io/acts-project/ubuntu2404_clang22:85
             compiler: llvm@22.1.1
             os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404:84
+          - image: ghcr.io/acts-project/ubuntu2404:85
             compiler: gcc@13.3.0
             os: ubuntu-24.04-arm
             default: false
 
-          - image: ghcr.io/acts-project/alma9-base:84
+          - image: ghcr.io/acts-project/alma9-base:85
             compiler: gcc@15.1.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             cxxstd: "23"
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang22:84
+          - image: ghcr.io/acts-project/ubuntu2404_clang22:85
             compiler: llvm@22.1.1
             os: ubuntu-latest
             cxxstd: "23"
