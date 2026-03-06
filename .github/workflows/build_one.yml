@@ -34,6 +34,7 @@ on:
 jobs:
 
   build:
+    name: Spack build (${{ inputs.compiler }})
     runs-on: "${{ inputs.os }}"
 
     outputs:
@@ -213,6 +214,7 @@ jobs:
           popd
 
   build_docker:
+    name: Build and push Docker image
     if: "inputs.image != ''"
     runs-on: "${{ inputs.os }}"
     needs: [build]
