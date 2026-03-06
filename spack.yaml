@@ -1,15 +1,15 @@
 spack:
   specs:
     - boost@1.89.0 +program_options +test +json +graph +filesystem
-    - cmake@4.2.0
-    - edm4hep@main
+    - cmake@4.2
+    - edm4hep@1.0
     - eigen@5.0.1
     - intel-tbb@2022.3.0
     - nlohmann-json@3.12.0
-    - podio@master
-    - root@6.38.00 -aqua -opengl
-    - dd4hep@master +xercesc +edm4hep +hepmc3
-    - geomodel@6.22.0 +geomodelg4
+    - podio@1.7
+    - root@6.38.02 -aqua -opengl
+    - dd4hep@1.35 +xercesc +edm4hep +hepmc3
+    - geomodel@6.24.0 +geomodelg4
     - python@3.14
     - py-pybind11 @3.0.1
     - py-pip
@@ -23,9 +23,9 @@ spack:
     - zlib-ng
     - bzip2
 
-    - pythia8@8.316 -hepmc +hepmc3
-    - geant4@11.3.2 -data
-    - fastjet@3.5.0 plugins=cxx
+    - pythia8@8.317 -hepmc +hepmc3
+    - geant4@11.4.0 -data
+    - fastjet@3.5.1 plugins=cxx
 
     - onnxruntime-bin@1.21.0
   packages:
