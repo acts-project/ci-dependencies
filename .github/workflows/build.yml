@@ -33,7 +33,7 @@ jobs:
            compiler: "apple-clang@17.0.0"
            default: false
 
-    uses: ./.github/workflows/spack.yml
+    uses: ./.github/workflows/build_one.yml
     with:
       os: ${{ matrix.os }}
       xcode: ${{ matrix.xcode }}
@@ -81,7 +81,7 @@ jobs:
             cxxstd: "23"
             default: false
 
-    uses: ./.github/workflows/spack.yml
+    uses: ./.github/workflows/build_one.yml
     with:
       os: ${{ matrix.os }}
       image: ${{ matrix.image }}
