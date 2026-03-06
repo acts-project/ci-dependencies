@@ -36,6 +36,11 @@ if [ -z "${COMPILER:-}" ]; then
     exit 1
 fi
 
+if [ -z "${CXXSTD:-}" ]; then
+    echo "CXXSTD is not set"
+    exit 1
+fi
+
 
 start_section "Setting up spack from $SPACK_ROOT"
 source "$SPACK_ROOT"/share/spack/setup-env.sh
@@ -64,11 +69,11 @@ start_section "Locate OpenGL"
 "$SCRIPT_DIR"/opengl.sh
 end_section
 
-start_section "Select compiler"
+start_section "Select compiler and cxxstd"
 spack -e . compiler list
 echo "Looking for compiler: $COMPILER"
 spack -e . compiler list | grep "$COMPILER"
-spack -e . config add "packages:all:require: [\"%$COMPILER\"]"
+spack -e . config add "packages:all:require: [\"%$COMPILER\", \"cxxstd=$CXXSTD\"]"
 end_section
 
 start_section "Concretize"
@@ -96,4 +101,4 @@ function set_env {
 }
 
 set_env TARGET_ARCH "$(spack arch --family)"
-set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}"
+set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${CXXSTD}"

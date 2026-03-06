@@ -13,6 +13,7 @@ on:
 
 jobs:
   build_macos:
+    name: macos ${{ matrix.os }} · ${{ matrix.compiler }}
     strategy:
       fail-fast: false
       matrix:
@@ -33,7 +34,7 @@ jobs:
            compiler: "apple-clang@17.0.0"
            default: false
 
-    uses: ./.github/workflows/spack.yml
+    uses: ./.github/workflows/build_one.yml
     with:
       os: ${{ matrix.os }}
       xcode: ${{ matrix.xcode }}
@@ -42,42 +43,58 @@ jobs:
     secrets: inherit
 
   build_container:
+    name: ${{ matrix.compiler }}${{ matrix.cxxstd == '23' && ' (C++23)' || '' }} · ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
 
         include:
-          - image: ghcr.io/acts-project/alma9-base:82
-            compiler: gcc@14.2.1
-            compiler_path: "/opt/rh/gcc-toolset-14/root"
+          - image: ghcr.io/acts-project/alma9-base:84
+            compiler: gcc@15.1.1
+            compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404:82
+          - image: ghcr.io/acts-project/ubuntu2404:84
             compiler: gcc@13.3.0
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang19:82
-            compiler: llvm@19.1.7
+          - image: ghcr.io/acts-project/ubuntu2404_clang22:84
+            compiler: llvm@22.1.1
             os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404:82
+          - image: ghcr.io/acts-project/ubuntu2404:84
             compiler: gcc@13.3.0
             os: ubuntu-24.04-arm
             default: false
 
-    uses: ./.github/workflows/spack.yml
+          - image: ghcr.io/acts-project/alma9-base:84
+            compiler: gcc@15.1.1
+            compiler_path: "/opt/rh/gcc-toolset-15/root"
+            os: ubuntu-latest
+            cxxstd: "23"
+            default: false
+
+          - image: ghcr.io/acts-project/ubuntu2404_clang22:84
+            compiler: llvm@22.1.1
+            os: ubuntu-latest
+            cxxstd: "23"
+            default: false
+
+    uses: ./.github/workflows/build_one.yml
     with:
       os: ${{ matrix.os }}
       image: ${{ matrix.image }}
       compiler: ${{ matrix.compiler }}
-      compiler_path: ${{ matrix.compiler_path }}
+      compiler_path: ${{ matrix.compiler_path || '' }}
+      cxxstd: ${{ matrix.cxxstd || '20' }}
       default: ${{ matrix.default }}
     secrets: inherit
 
   merge_container:
+    name: Merge and push container manifests
     runs-on: ubuntu-latest
     needs: [build_container]
     if: startsWith(github.ref, 'refs/tags/')
