@@ -7,7 +7,7 @@ spack:
     - intel-tbb@2022.3.0
     - nlohmann-json@3.12.0
     - podio@1.7
-    - root@6.38.02 -aqua -opengl
+    - root@6.38.02 -aqua -opengl -cxxmodules
     - dd4hep@1.35 +xercesc +edm4hep +hepmc3
     - geomodel@6.24.0 +geomodelg4
     - python@3.14
