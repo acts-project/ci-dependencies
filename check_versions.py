@@ -36,7 +36,10 @@ def find_spack() -> str:
         candidate = Path(spack_root) / "bin" / "spack"
         if candidate.is_file():
             return str(candidate)
-    for candidate in [Path.home() / "spack" / "bin" / "spack", Path("/opt/spack/bin/spack")]:
+    for candidate in [
+        Path.home() / "spack" / "bin" / "spack",
+        Path("/opt/spack/bin/spack"),
+    ]:
         if candidate.is_file():
             return str(candidate)
     return "spack"  # last resort: hope it's on PATH
@@ -135,6 +138,36 @@ def check_package(name: str, current: str | None) -> dict:
     }
 
 
+def update_spack_yaml(yaml_path: Path, updates: dict[str, str]) -> int:
+    """Rewrite yaml_path replacing versions for packages in updates.
+
+    Returns the count of lines changed.
+    """
+    lines = yaml_path.read_text().splitlines(keepends=True)
+    changed = 0
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            spec = stripped[2:].strip()
+            match = re.match(r"^([a-zA-Z0-9_-]+)\s*@\s*([^\s+~^%]+)", spec)
+            if match:
+                name, old_ver = match.group(1), match.group(2)
+                if name in updates:
+                    new_line = re.sub(
+                        r"(" + re.escape(name) + r"\s*@\s*)" + re.escape(old_ver),
+                        r"\g<1>" + updates[name],
+                        line,
+                        count=1,
+                    )
+                    if new_line != line:
+                        changed += 1
+                    line = new_line
+        new_lines.append(line)
+    yaml_path.write_text("".join(new_lines))
+    return changed
+
+
 @app.command()
 def main(
     spack_yaml: Annotated[
@@ -145,6 +178,12 @@ def main(
         int,
         typer.Option("--jobs", "-j", help="Parallel spack queries.", min=1, max=32),
     ] = 8,
+    update: Annotated[
+        bool,
+        typer.Option(
+            "--update", "-u", help="Write latest versions back to spack.yaml."
+        ),
+    ] = False,
 ) -> None:
     packages = parse_spack_yaml(spack_yaml)
     console.print(
@@ -165,7 +204,9 @@ def main(
             idx = futures[future]
             results[idx] = future.result()
             completed += 1
-            console.print(f"  [{completed}/{len(packages)}] {results[idx]['name']}", end="\r")
+            console.print(
+                f"  [{completed}/{len(packages)}] {results[idx]['name']}", end="\r"
+            )
 
     console.print(" " * 60, end="\r")  # clear progress line
 
@@ -193,9 +234,20 @@ def main(
 
     outdated = [r for r in results if r["style"] == "yellow"]
     if outdated:
-        console.print(f"\n[yellow]{len(outdated)} package(s) have newer versions available.[/yellow]")
+        console.print(
+            f"\n[yellow]{len(outdated)} package(s) have newer versions available.[/yellow]"
+        )
     else:
         console.print("\n[green]All versioned packages are up-to-date.[/green]")
+
+    if update and outdated:
+        updates = {r["name"]: r["latest"] for r in outdated}
+        n = update_spack_yaml(spack_yaml, updates)
+        console.print(
+            f"\n[green]Updated {n} version(s) in [cyan]{spack_yaml}[/cyan].[/green]"
+        )
+        for r in outdated:
+            console.print(f"  [bold]{r['name']}[/bold]: {r['current']} → {r['latest']}")
 
 
 if __name__ == "__main__":
