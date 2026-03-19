@@ -23,6 +23,9 @@ jobs:
       - name: Set up Spack
         uses: spack/setup-spack@v2
 
+      - name: Bootstrap Spack
+        run: spack bootstrap now
+
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v5
 
