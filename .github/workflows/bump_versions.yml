@@ -20,22 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Spack
-        uses: spack/setup-spack@v2
-
-      - name: Bootstrap Spack
-        run: spack bootstrap now
-
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Debug spack info output
-        run: spack info --no-variants --no-dependencies boost
-
       - name: Check and update versions
-        run: |
-          export SPACK_ROOT=$(spack location -r)
-          uv run check_versions.py --update
+        run: uv run check_versions.py --update
 
       - name: Create or update pull request
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
