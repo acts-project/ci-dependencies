@@ -2,6 +2,8 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
+#   "diskcache",
+#   "httpx",
 #   "pyyaml",
 #   "rich",
 #   "typer",
@@ -9,14 +11,13 @@
 # ///
 """Check spack package versions against latest available."""
 
-import os
+import asyncio
 import re
-import subprocess
-import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Annotated
 
+import diskcache
+import httpx
 import typer
 import yaml
 from rich import box
@@ -27,22 +28,9 @@ app = typer.Typer(help="Check spack package versions for updates.")
 console = Console()
 
 BRANCH_SPECS = {"main", "master", "develop", "HEAD"}
+PACKAGES_URL = "https://packages.spack.io/data/packages"
 
-
-def find_spack() -> str:
-    """Return path to the real spack binary (not the shell function wrapper)."""
-    spack_root = os.environ.get("SPACK_ROOT")
-    if spack_root:
-        candidate = Path(spack_root) / "bin" / "spack"
-        if candidate.is_file():
-            return str(candidate)
-    for candidate in [Path.home() / "spack" / "bin" / "spack", Path("/opt/spack/bin/spack")]:
-        if candidate.is_file():
-            return str(candidate)
-    return "spack"  # last resort: hope it's on PATH
-
-
-SPACK = find_spack()
+cache = diskcache.Cache(Path.home() / ".cache" / "spack-check-versions")
 
 
 def parse_spack_yaml(yaml_path: Path) -> dict[str, str | None]:
@@ -59,39 +47,27 @@ def parse_spack_yaml(yaml_path: Path) -> dict[str, str | None]:
     return packages
 
 
-def get_latest_safe_version(package: str) -> str | None:
-    """Run `spack info` and return the highest numeric safe version."""
-    try:
-        result = subprocess.run(
-            [SPACK, "info", "--no-variants", "--no-dependencies", package],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-    except FileNotFoundError:
-        console.print(f"[red]Error:[/red] spack binary not found (tried: {SPACK})")
-        sys.exit(1)
-    except subprocess.TimeoutExpired:
-        return None
+async def get_latest_safe_version(
+    package: str, client: httpx.AsyncClient, sem: asyncio.Semaphore
+) -> str | None:
+    """Query packages.spack.io and return the latest numeric safe version."""
+    if package in cache:
+        data = cache[package]
+    else:
+        url = f"{PACKAGES_URL}/{package}.json"
+        try:
+            async with sem:
+                resp = await client.get(url, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+        except (httpx.HTTPError, httpx.TimeoutException):
+            return None
+        cache.set(package, data, expire=60 * 60)
 
-    if result.returncode != 0:
-        return None
-
-    in_safe = False
-    for line in result.stdout.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("Safe versions:"):
-            in_safe = True
-            continue
-        if in_safe:
-            if not stripped:
-                continue
-            # Any line not starting a new section is a version entry
-            if stripped[0].isalpha() and stripped.endswith(":"):
-                break  # next section header
-            token = stripped.split()[0]
-            if re.match(r"^\d", token):
-                return token  # spack lists newest first
+    for v in data.get("versions", []):
+        name = v if isinstance(v, str) else v.get("name", "")
+        if re.match(r"^\d", name):
+            return name  # site lists newest first
     return None
 
 
@@ -123,8 +99,10 @@ def status_style(constraint: str | None, latest: str | None) -> tuple[str, str]:
     return f"outdated  →  {latest}", "yellow"
 
 
-def check_package(name: str, current: str | None) -> dict:
-    latest = get_latest_safe_version(name)
+async def check_package(
+    name: str, current: str | None, client: httpx.AsyncClient, sem: asyncio.Semaphore
+) -> dict:
+    latest = await get_latest_safe_version(name, client, sem)
     status, style = status_style(current, latest)
     return {
         "name": name,
@@ -135,6 +113,36 @@ def check_package(name: str, current: str | None) -> dict:
     }
 
 
+def update_spack_yaml(yaml_path: Path, updates: dict[str, str]) -> int:
+    """Rewrite yaml_path replacing versions for packages in updates.
+
+    Returns the count of lines changed.
+    """
+    lines = yaml_path.read_text().splitlines(keepends=True)
+    changed = 0
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            spec = stripped[2:].strip()
+            match = re.match(r"^([a-zA-Z0-9_-]+)\s*@\s*([^\s+~^%]+)", spec)
+            if match:
+                name, old_ver = match.group(1), match.group(2)
+                if name in updates:
+                    new_line = re.sub(
+                        r"(" + re.escape(name) + r"\s*@\s*)" + re.escape(old_ver),
+                        r"\g<1>" + updates[name],
+                        line,
+                        count=1,
+                    )
+                    if new_line != line:
+                        changed += 1
+                    line = new_line
+        new_lines.append(line)
+    yaml_path.write_text("".join(new_lines))
+    return changed
+
+
 @app.command()
 def main(
     spack_yaml: Annotated[
@@ -143,30 +151,45 @@ def main(
     ] = Path("spack.yaml"),
     jobs: Annotated[
         int,
-        typer.Option("--jobs", "-j", help="Parallel spack queries.", min=1, max=32),
+        typer.Option("--jobs", "-j", help="Max concurrent requests.", min=1, max=32),
     ] = 8,
+    update: Annotated[
+        bool,
+        typer.Option(
+            "--update", "-u", help="Write latest versions back to spack.yaml."
+        ),
+    ] = False,
 ) -> None:
     packages = parse_spack_yaml(spack_yaml)
     console.print(
         f"\nChecking [bold]{len(packages)}[/bold] packages from [cyan]{spack_yaml}[/cyan]"
-        f" using [dim]{SPACK}[/dim] with up to [bold]{jobs}[/bold] parallel queries...\n"
+        f" via [dim]{PACKAGES_URL}[/dim] with up to [bold]{jobs}[/bold] concurrent requests...\n"
     )
 
-    results: list[dict] = [{}] * len(packages)
-    items = list(packages.items())
+    async def run() -> list[dict]:
+        sem = asyncio.Semaphore(jobs)
+        async with httpx.AsyncClient() as client:
+            tasks = [
+                check_package(name, ver, client, sem)
+                for name, ver in packages.items()
+            ]
+            pending = {asyncio.ensure_future(t): i for i, t in enumerate(tasks)}
+            results = [{}] * len(tasks)
+            completed = 0
+            while pending:
+                done, _ = await asyncio.wait(
+                    pending.keys(), return_when=asyncio.FIRST_COMPLETED
+                )
+                for fut in done:
+                    idx = pending.pop(fut)
+                    results[idx] = fut.result()
+                    completed += 1
+                    console.print(
+                        f"  [{completed}/{len(tasks)}] {results[idx]['name']}", end="\r"
+                    )
+        return results
 
-    with ThreadPoolExecutor(max_workers=jobs) as executor:
-        futures = {
-            executor.submit(check_package, name, ver): idx
-            for idx, (name, ver) in enumerate(items)
-        }
-        completed = 0
-        for future in as_completed(futures):
-            idx = futures[future]
-            results[idx] = future.result()
-            completed += 1
-            console.print(f"  [{completed}/{len(packages)}] {results[idx]['name']}", end="\r")
-
+    results = asyncio.run(run())
     console.print(" " * 60, end="\r")  # clear progress line
 
     table = Table(
@@ -193,9 +216,20 @@ def main(
 
     outdated = [r for r in results if r["style"] == "yellow"]
     if outdated:
-        console.print(f"\n[yellow]{len(outdated)} package(s) have newer versions available.[/yellow]")
+        console.print(
+            f"\n[yellow]{len(outdated)} package(s) have newer versions available.[/yellow]"
+        )
     else:
         console.print("\n[green]All versioned packages are up-to-date.[/green]")
+
+    if update and outdated:
+        updates = {r["name"]: r["latest"] for r in outdated}
+        n = update_spack_yaml(spack_yaml, updates)
+        console.print(
+            f"\n[green]Updated {n} version(s) in [cyan]{spack_yaml}[/cyan].[/green]"
+        )
+        for r in outdated:
+            console.print(f"  [bold]{r['name']}[/bold]: {r['current']} → {r['latest']}")
 
 
 if __name__ == "__main__":
