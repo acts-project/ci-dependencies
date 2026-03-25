@@ -28,6 +28,10 @@ spack:
     - fastjet@3.5.0 plugins=cxx
 
     - onnxruntime-bin@1.21.0
+
+    - millepede@5 +root
+    - mille@1 +root
+    - generalbrokenlines@4 +root
   packages:
     all:
       target:
