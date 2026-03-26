@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
+from typing import Optional
+
 from spack_repo.builtin.build_systems.generic import Package
 
 from spack.package import *
@@ -13,11 +15,11 @@ from spack.util.prefix import Prefix
 def _add_version(
     version: str,
     sha256: str,
-    sha256_linux_x86_64: str | None = None,
-    sha256_linux_x86_64_gpu: str | None = None,
-    sha256_linux_aarch64: str | None = None,
-    sha256_darwin_aarch64: str | None = None,
-    sha256_darwin_x86_64: str | None = None,
+    sha256_linux_x86_64: Optional[str] = None,
+    sha256_linux_x86_64_gpu: Optional[str] = None,
+    sha256_linux_aarch64: Optional[str] = None,
+    sha256_darwin_aarch64: Optional[str] = None,
+    sha256_darwin_x86_64: Optional[str] = None,
 ):
 
     version_directive(version, sha256=sha256)
