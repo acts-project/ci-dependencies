@@ -67,7 +67,7 @@ async def get_latest_safe_version(
     for v in data.get("versions", []):
         name = v if isinstance(v, str) else v.get("name", "")
         if re.match(r"^\d", name):
-            return name  # site lists newest first
+            return normalize_version(name)  # site lists newest first
     return None
 
 
@@ -82,6 +82,18 @@ def version_satisfied(constraint: str, latest: str) -> bool:
         return True
     # prefix match: constraint is a strict prefix of latest when followed by '.'
     return latest.startswith(constraint + ".")
+
+
+def normalize_version(v: str) -> str:
+    """Normalize a version string to dot-separated, stripping leading zeros.
+
+    Converts dash-separated versions (e.g. '05-01-00') to dot-separated
+    ('5.1.0') so they can be compared with standard spack constraints.
+    Pure dot-separated versions are returned as-is.
+    """
+    if re.match(r"^\d+(-\d+)*$", v):
+        return ".".join(str(int(part)) for part in v.split("-"))
+    return v
 
 
 def status_style(constraint: str | None, latest: str | None) -> tuple[str, str]:
