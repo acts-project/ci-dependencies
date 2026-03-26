@@ -29,9 +29,9 @@ spack:
 
     - onnxruntime-bin@1.21.0
 
-    - millepede@5 +root
-    - mille@1 +root
-    - generalbrokenlines@4 +root
+    - millepede@05-01-00 +root
+    - mille@01-00-00 +root
+    - generalbrokenlines@04-00-01 +root
   packages:
     all:
       target:
