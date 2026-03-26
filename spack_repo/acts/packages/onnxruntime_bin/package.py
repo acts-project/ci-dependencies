@@ -13,59 +13,64 @@ from spack.util.prefix import Prefix
 def _add_version(
     version: str,
     sha256: str,
-    sha256_linux_x86_64: str,
-    sha256_linux_x86_64_gpu: str,
-    sha256_linux_aarch64: str,
-    sha256_darwin_aarch64: str,
-    sha256_darwin_x86_64: str,
+    sha256_linux_x86_64: str | None = None,
+    sha256_linux_x86_64_gpu: str | None = None,
+    sha256_linux_aarch64: str | None = None,
+    sha256_darwin_aarch64: str | None = None,
+    sha256_darwin_x86_64: str | None = None,
 ):
 
     version_directive(version, sha256=sha256)
 
-    resource(
-        name=f"linux-x86_64-gpu-v{version}",
-        url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-linux-x64-gpu-{version}.tgz",
-        sha256=sha256_linux_x86_64_gpu,
-        when=f"@{version} +gpu platform=linux target=x86_64:",
-        destination="./",
-        placement="binaries",
-    )
+    if sha256_linux_x86_64_gpu is not None:
+        resource(
+            name=f"linux-x86_64-gpu-v{version}",
+            url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-linux-x64-gpu-{version}.tgz",
+            sha256=sha256_linux_x86_64_gpu,
+            when=f"@{version} +gpu platform=linux target=x86_64:",
+            destination="./",
+            placement="binaries",
+        )
 
-    resource(
-        name=f"linux-x86_64-v{version}",
-        url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-linux-x64-{version}.tgz",
-        sha256=sha256_linux_x86_64,
-        when=f"@{version} ~gpu platform=linux target=x86_64:",
-        destination="./",
-        placement="binaries",
-    )
+    if sha256_linux_x86_64 is not None:
+        resource(
+            name=f"linux-x86_64-v{version}",
+            url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-linux-x64-{version}.tgz",
+            sha256=sha256_linux_x86_64,
+            when=f"@{version} ~gpu platform=linux target=x86_64:",
+            destination="./",
+            placement="binaries",
+        )
 
-    resource(
-        name=f"linux-aarch64-v{version}",
-        url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-linux-aarch64-{version}.tgz",
-        sha256=sha256_linux_aarch64,
-        when=f"@{version} ~gpu platform=linux target=aarch64:",
-        destination="./",
-        placement="binaries",
-    )
+    if sha256_linux_aarch64 is not None:
+        resource(
+            name=f"linux-aarch64-v{version}",
+            url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-linux-aarch64-{version}.tgz",
+            sha256=sha256_linux_aarch64,
+            when=f"@{version} ~gpu platform=linux target=aarch64:",
+            destination="./",
+            placement="binaries",
+        )
 
-    resource(
-        name=f"osx-arm64-{version}",
-        url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-osx-arm64-{version}.tgz",
-        sha256=sha256_darwin_aarch64,
-        when=f"@{version} ~gpu platform=darwin target=aarch64:",
-        destination="./",
-        placement="binaries",
-    )
+    if sha256_darwin_aarch64 is not None:
+        resource(
+            name=f"osx-arm64-{version}",
+            url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-osx-arm64-{version}.tgz",
+            sha256=sha256_darwin_aarch64,
+            when=f"@{version} ~gpu platform=darwin target=aarch64:",
+            destination="./",
+            placement="binaries",
+        )
 
-    resource(
-        name=f"osx-x86_64-{version}",
-        url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-osx-x86_64-{version}.tgz",
-        sha256=sha256_darwin_x86_64,
-        when=f"@{version} ~gpu platform=darwin target=x86_64:",
-        destination="./",
-        placement="binaries",
-    )
+    if sha256_darwin_x86_64 is not None:
+        resource(
+            name=f"osx-x86_64-{version}",
+            url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-osx-x86_64-{version}.tgz",
+            sha256=sha256_darwin_x86_64,
+            when=f"@{version} ~gpu platform=darwin target=x86_64:",
+            destination="./",
+            placement="binaries",
+        )
 
 
 class OnnxruntimeBin(Package):
@@ -144,6 +149,16 @@ class OnnxruntimeBin(Package):
         sha256_linux_x86_64="b6deea7f2e22c10c043019f294a0ea4d2a6c0ae52a009c34847640db75ec5580",
         sha256_linux_x86_64_gpu="fc5d0e2dbdb893de11758da83523169761a70562dc0f6991f2cdb614f6a62c3d",
     )
+
+    _add_version(
+    "1.24.4",
+    sha256="0cf4d2ee4392fbb8aedaabc6b2ba11b4a680d1071fa4f75546c2289ca5b404cf",
+    sha256_darwin_aarch64="93787795f47e1eee369182e43ed51b9e5da0878ab0346aecf4258979b8bba989",
+    # sha256_darwin_x86_64 not available for this version
+    sha256_linux_aarch64="866109a9248d057671a039b9d725be4bd86888e3754140e6701ec621be9d4d7e",
+    sha256_linux_x86_64="3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747",
+    sha256_linux_x86_64_gpu="c5f804ff5d239b436fa59e9f2fb288a39f7eb9552f6a636c8b71e792e91a8808",
+)
 
     def install(self, spec: spack.spec.Spec, prefix: Prefix) -> None:
         install_tree("./binaries", prefix)

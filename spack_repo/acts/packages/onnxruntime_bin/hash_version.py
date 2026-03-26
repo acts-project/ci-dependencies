@@ -145,9 +145,6 @@ async def download_all(version: str, progress: Progress) -> dict[str, str | None
 @app.command()
 def main(
     version: Annotated[str, typer.Argument(help="Version to download (e.g., 1.21.0)")],
-    skip_missing: Annotated[
-        bool, typer.Option("--skip-missing", "-s", help="Use '0' for missing platforms")
-    ] = True,
 ) -> None:
     """Download onnxruntime releases and calculate SHA256 hashes."""
     console.print(f"\n[bold]Calculating hashes for onnxruntime v{version}[/bold]\n")
@@ -179,22 +176,24 @@ def main(
     # Generate code fragment
     console.print("\n[bold]Code fragment for package.py:[/bold]\n")
 
-    def get_hash(key: str) -> str:
+    platform_keys = [
+        ("sha256_darwin_aarch64", "darwin_aarch64"),
+        ("sha256_darwin_x86_64", "darwin_x86_64"),
+        ("sha256_linux_aarch64", "linux_aarch64"),
+        ("sha256_linux_x86_64", "linux_x86_64"),
+        ("sha256_linux_x86_64_gpu", "linux_x86_64_gpu"),
+    ]
+
+    lines = [f'_add_version(\n    "{version}",\n    sha256="{hashes.get("source") or ""}",']
+    for param, key in platform_keys:
         h = hashes.get(key)
         if h:
-            return h
-        return "0" if skip_missing else "None  # NOT AVAILABLE"
+            lines.append(f'    {param}="{h}",')
+        else:
+            lines.append(f'    # {param} not available for this version')
+    lines.append(")")
 
-    fragment = f'''_add_version(
-    "{version}",
-    sha256="{get_hash("source")}",
-    sha256_darwin_aarch64="{get_hash("darwin_aarch64")}",
-    sha256_darwin_x86_64="{get_hash("darwin_x86_64")}",
-    sha256_linux_aarch64="{get_hash("linux_aarch64")}",
-    sha256_linux_x86_64="{get_hash("linux_x86_64")}",
-    sha256_linux_x86_64_gpu="{get_hash("linux_x86_64_gpu")}",
-)'''
-
+    fragment = "\n".join(lines)
     console.print(fragment)
     console.print()
 
