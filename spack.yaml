@@ -23,6 +23,9 @@ spack:
     - zlib-ng
     - bzip2
 
+    - git@2
+    - ninja
+
     - pythia8@8.317 -hepmc +hepmc3
     - geant4@11.4.1 -data
     - fastjet@3.5.0 plugins=cxx
