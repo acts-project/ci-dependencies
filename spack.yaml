@@ -30,7 +30,7 @@ spack:
     - geant4@11.4.1 -data
     - fastjet@3.5.0 plugins=cxx
 
-    - onnxruntime-bin@1.21.0
+    - onnxruntime-bin@1.24.4
 
     - millepede@5 +root
     - mille@1 +root
