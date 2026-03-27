@@ -153,14 +153,14 @@ class OnnxruntimeBin(Package):
     )
 
     _add_version(
-    "1.24.4",
-    sha256="0cf4d2ee4392fbb8aedaabc6b2ba11b4a680d1071fa4f75546c2289ca5b404cf",
-    sha256_darwin_aarch64="93787795f47e1eee369182e43ed51b9e5da0878ab0346aecf4258979b8bba989",
-    # sha256_darwin_x86_64 not available for this version
-    sha256_linux_aarch64="866109a9248d057671a039b9d725be4bd86888e3754140e6701ec621be9d4d7e",
-    sha256_linux_x86_64="3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747",
-    sha256_linux_x86_64_gpu="c5f804ff5d239b436fa59e9f2fb288a39f7eb9552f6a636c8b71e792e91a8808",
-)
+        "1.24.4", 
+        sha256="0cf4d2ee4392fbb8aedaabc6b2ba11b4a680d1071fa4f75546c2289ca5b404cf",
+        sha256_darwin_aarch64="93787795f47e1eee369182e43ed51b9e5da0878ab0346aecf4258979b8bba989",
+        # sha256_darwin_x86_64 not available for this version
+        sha256_linux_aarch64="866109a9248d057671a039b9d725be4bd86888e3754140e6701ec621be9d4d7e",
+        sha256_linux_x86_64="3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747",
+        sha256_linux_x86_64_gpu="c5f804ff5d239b436fa59e9f2fb288a39f7eb9552f6a636c8b71e792e91a8808",
+    )
 
     def install(self, spec: spack.spec.Spec, prefix: Prefix) -> None:
         install_tree("./binaries", prefix)
