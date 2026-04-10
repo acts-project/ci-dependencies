@@ -8,8 +8,8 @@ spack:
     - nlohmann-json@3.12.0
     - podio@1.7
     - root@6.38.04 -aqua -opengl -cxxmodules
-    - dd4hep@1.35 +xercesc +edm4hep +hepmc3
-    - geomodel@6.24.0 +geomodelg4
+    - dd4hep@1.36 +xercesc +edm4hep +hepmc3
+    - geomodel@6.25.0 +geomodelg4
     - python@3.14
     - py-pybind11 @3.0.2
     - py-pip
