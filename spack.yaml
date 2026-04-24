@@ -35,6 +35,8 @@ spack:
     - millepede@5 +root
     - mille@1 +root
     - generalbrokenlines@4 +root
+
+    - googletest@1.17.0
   packages:
     all:
       target:
