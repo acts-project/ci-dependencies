@@ -2,6 +2,7 @@ spack:
   specs:
     - boost@1.90.0 +program_options +test +json +graph +filesystem
     - cmake@4.2
+    - ccache@4.12
     - edm4hep@1.0
     - eigen@5.0.1
     - intel-tbb@2022.3.0
