@@ -43,7 +43,7 @@ spack:
       target:
       - aarch64
       - x86_64
-      variants: build_type=Release
+      variants: build_type=Release build_system=cmake
     mesa:
       buildable: false
 
