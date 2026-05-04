@@ -46,6 +46,12 @@ spack:
       variants: build_type=Release
     mesa:
       buildable: false
+    # work around https://github.com/spack/spack-packages/pull/4569
+    openblas:
+      require:
+        - '%c=gcc'
+        - '%cxx=gcc'
+        - '%fortran=gcc'
 
   concretizer:
     unify: true
