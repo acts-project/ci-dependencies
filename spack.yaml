@@ -19,7 +19,7 @@ spack:
 
     - hepmc3@3.3.1 +rootio
     # compression libraries that can be used by hepmc3 if configured
-    - zstd
+    - zstd build_system=cmake
     - lz4
     - zlib-ng
     - bzip2
@@ -40,7 +40,7 @@ spack:
     - googletest@1.17.0
     # perf counters only supported on linux
     - benchmark@1.9.5 -performance_counters
-
+    - arrow@23.0.1 +bz2 +parquet +zlib +zstd +dataset +filesystem +compute +snappy +brotli
   packages:
     all:
       target:
