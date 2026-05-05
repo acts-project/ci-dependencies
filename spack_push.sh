@@ -24,6 +24,7 @@ echo "+ Pushing to buildcache"
 "$SCRIPT_DIR/retry.sh" spack -e . \
   buildcache push \
   --base-image "${BASE_IMAGE}" \
+  --allow-missing \
   --unsigned \
   acts-spack-buildcache
 
