@@ -38,6 +38,9 @@ spack:
     - generalbrokenlines@4 +root
 
     - googletest@1.17.0
+    # perf counters only supported on linux
+    - benchmark@1.9.5 -performance_counters
+
   packages:
     all:
       target:
