@@ -13,7 +13,7 @@ on:
 
 jobs:
   build_macos:
-    name: macos ${{ matrix.os }} · ${{ matrix.compiler }}
+    name: macos ${{ matrix.os }} · Xcode ${{ matrix.xcode }} · ${{ matrix.compiler }}
     strategy:
       fail-fast: false
       matrix:
@@ -23,6 +23,11 @@ jobs:
            xcode: "26.3"
            compiler: "apple-clang@17.0.0"
            default: true
+
+         - os: macos-26
+           xcode: "26.4"
+           compiler: "apple-clang@21.0.0"
+           default: false
 
     uses: ./.github/workflows/build_one.yml
     with:
