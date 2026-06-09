@@ -41,7 +41,6 @@ spack:
       # perf counters only supported on linux
     - benchmark@1.9.5
     - arrow@23.0.1 +bz2 +parquet +zlib +zstd +dataset +filesystem +compute +snappy +brotli +python
-    - py-pyarrow
   packages:
     all:
       target:
