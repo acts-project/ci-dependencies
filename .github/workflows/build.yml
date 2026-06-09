@@ -39,38 +39,49 @@ jobs:
       matrix:
 
         include:
-          - image: ghcr.io/acts-project/alma9-base:85
+          - image: ghcr.io/acts-project/alma9-base:86
             compiler: gcc@15.1.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404:85
+          - image: ghcr.io/acts-project/ubuntu2404:86
             compiler: gcc@13.3.0
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang22:85
+          - image: ghcr.io/acts-project/ubuntu2404_clang22:86
             compiler: llvm@22.1.1
             os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404:85
+          - image: ghcr.io/acts-project/ubuntu2404:86
             compiler: gcc@13.3.0
             os: ubuntu-24.04-arm
             default: false
 
-          - image: ghcr.io/acts-project/alma9-base:85
+          - image: ghcr.io/acts-project/alma9-base:86
             compiler: gcc@15.1.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             cxxstd: "23"
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang22:85
+          - image: ghcr.io/acts-project/ubuntu2404_clang22:86
             compiler: llvm@22.1.1
             os: ubuntu-latest
             cxxstd: "23"
+            default: false
+
+          - image: ghcr.io/acts-project/alma10-base:86
+            compiler: gcc@15.1.1
+            compiler_path: "/opt/rh/gcc-toolset-15/root"
+            os: ubuntu-latest
+            default: false
+
+          - image: ghcr.io/acts-project/ubuntu2604:86
+            compiler: gcc@15.2.0
+            os: ubuntu-latest
             default: false
 
     uses: ./.github/workflows/build_one.yml
