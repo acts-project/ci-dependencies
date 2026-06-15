@@ -40,7 +40,7 @@ jobs:
 
         include:
           - image: ghcr.io/acts-project/alma9-base:86
-            compiler: gcc@15.1.1
+            compiler: gcc@15.2.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             default: true
@@ -51,7 +51,7 @@ jobs:
             default: true
 
           - image: ghcr.io/acts-project/ubuntu2404_clang22:86
-            compiler: llvm@22.1.1
+            compiler: llvm@22.1.7
             os: ubuntu-latest
             default: false
 
@@ -61,26 +61,26 @@ jobs:
             default: false
 
           - image: ghcr.io/acts-project/alma9-base:86
-            compiler: gcc@15.1.1
+            compiler: gcc@15.2.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             cxxstd: "23"
             default: false
 
           - image: ghcr.io/acts-project/ubuntu2404_clang22:86
-            compiler: llvm@22.1.1
+            compiler: llvm@22.1.7
             os: ubuntu-latest
             cxxstd: "23"
             default: false
 
           - image: ghcr.io/acts-project/alma10-base:86
-            compiler: gcc@15.1.1
+            compiler: gcc@15.2.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             default: false
 
           - image: ghcr.io/acts-project/ubuntu2604:86
-            compiler: gcc@15.2.0
+            compiler: gcc@15.2.1
             os: ubuntu-latest
             default: false
 
