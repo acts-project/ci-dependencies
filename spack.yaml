@@ -18,7 +18,7 @@ spack:
     - py-pyyaml # for edm4hep + podio
 
     - hepmc3@3.3.1 +rootio
-    # compression libraries that can be used by hepmc3 if configured
+      # compression libraries that can be used by hepmc3 if configured
     - zstd build_system=cmake
     - lz4
     - zlib-ng
@@ -38,9 +38,9 @@ spack:
     - generalbrokenlines@4 +root
 
     - googletest@1.17.0
-    # perf counters only supported on linux
-    - benchmark@1.9.5 -performance_counters
-    - arrow@23.0.1 +bz2 +parquet +zlib +zstd +dataset +filesystem +compute +snappy +brotli
+      # perf counters only supported on linux
+    - benchmark@1.9.5
+    - arrow@23.0.1 +bz2 +parquet +zlib +zstd +dataset +filesystem +compute +snappy +brotli +python
   packages:
     all:
       target:

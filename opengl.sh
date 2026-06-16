@@ -26,7 +26,7 @@ if [[ "$os" == *ubuntu* ]]; then
   ${SUDO} apt-get update
   ${SUDO} apt-get install -y libgl1-mesa-dev
 
-if [[ "$os" == *ubuntu24* ]]; then
+if [[ "$os" == *ubuntu26* ]] || [[ "$os" == *ubuntu24* ]]; then
   version="4.6"
 elif [[ "$os" == *ubuntu20* ]]; then
   version="4.5"
