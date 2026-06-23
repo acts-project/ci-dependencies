@@ -100,6 +100,57 @@ jobs:
       cxxstd: ${{ matrix.cxxstd || '20' }}
       default: ${{ matrix.default }}
 
+  lockfile_diff:
+    name: Lockfile diff vs latest release
+    runs-on: ubuntu-latest
+    needs: [build_container]
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    env:
+      # Canonical lockfile to compare: the default ubuntu24.04 x86_64 build,
+      # which matches the published spack-container image. The name is
+      # compiler-version independent, so it diffs cleanly across releases.
+      CANONICAL_LOCK: spack_linux-ubuntu24.04-x86_64.lock
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Download lockfiles built in this PR
+        uses: actions/download-artifact@v7
+        with:
+          pattern: spack_*-locks
+          merge-multiple: true
+          path: pr-locks
+
+      - name: Fetch canonical lockfile from latest release
+        id: release_lock
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag=$(gh release view --json tagName -q .tagName)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          mkdir -p release-locks
+          gh release download "$tag" \
+            --pattern "$CANONICAL_LOCK" \
+            --dir release-locks
+
+      - name: Diff lockfiles into job summary
+        run: |
+          old="release-locks/$CANONICAL_LOCK"
+          new="pr-locks/$CANONICAL_LOCK"
+          {
+            echo "## Dependency changes vs \`${{ steps.release_lock.outputs.tag }}\`"
+            echo
+            echo "_Canonical lockfile: \`$CANONICAL_LOCK\`_"
+            echo
+            if [[ -f "$old" && -f "$new" ]]; then
+              uv run diff_lockfiles.py "$old" "$new" --markdown
+            else
+              echo "> Could not locate both lockfiles (old: \`$old\`, new: \`$new\`); skipping diff."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   merge_container:
     name: Merge and push container manifests
     runs-on: ubuntu-latest
