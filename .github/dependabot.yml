@@ -6,6 +6,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Wait before adopting freshly published releases, so a compromised
+    # release has a window to be caught/yanked before we pin to it.
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns:
