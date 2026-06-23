@@ -153,7 +153,7 @@ class OnnxruntimeBin(Package):
     )
 
     _add_version(
-        "1.24.4", 
+        "1.24.4",
         sha256="0cf4d2ee4392fbb8aedaabc6b2ba11b4a680d1071fa4f75546c2289ca5b404cf",
         sha256_darwin_aarch64="93787795f47e1eee369182e43ed51b9e5da0878ab0346aecf4258979b8bba989",
         # sha256_darwin_x86_64 not available for this version
