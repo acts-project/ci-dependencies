@@ -43,7 +43,7 @@ def find_installed_xcode_apps() -> List[XcodeVersion]:
 
         # Resolve symlinks to get the actual target
         resolved_path = app_path.resolve()
-        
+
         # Skip if we've already seen this target
         if resolved_path in seen_targets:
             continue
@@ -65,7 +65,7 @@ def find_installed_xcode_apps() -> List[XcodeVersion]:
 
             # Check if it's a beta version (check both original and resolved paths)
             is_beta = (
-                "beta" in bundle_version.lower() 
+                "beta" in bundle_version.lower()
                 or "beta" in app_path.name.lower()
                 or "beta" in resolved_path.name.lower()
             )
@@ -98,14 +98,14 @@ def normalize_version(ver: str) -> str:
     """Normalize version string for comparison (e.g., '16.4' -> '16.4.0')."""
     # Split on space to handle "16.4 Beta" format
     version_part = ver.split()[0]
-    
+
     # Split version into parts
     parts = version_part.split('.')
-    
+
     # Ensure we have at least major.minor.patch
     while len(parts) < 3:
         parts.append('0')
-    
+
     return '.'.join(parts[:3])  # Take only major.minor.patch
 
 
@@ -297,7 +297,7 @@ def select(
                 typer.echo(f"Creating symlink {canonical_path} -> {selected.path}")
                 canonical_path.symlink_to(selected.path)
                 typer.echo("✅ Canonical path created!")
-        
+
         # Set as active Xcode after cleanup
         developer_dir = final_path / "Contents" / "Developer"
         if dry_run:
@@ -330,4 +330,3 @@ def select(
 
 if __name__ == "__main__":
     app()
-

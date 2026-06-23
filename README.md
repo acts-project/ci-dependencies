@@ -8,7 +8,7 @@
 > If you're on **macOS** you need a fortran compiler: so `brew install gcc` before proceeding.
 
 - Go to the cloned dependencies repository
-    - Run `spack compiler find`. 
+    - Run `spack compiler find`.
       This populates spack's compiler packages with the externally found compilers.
     - Run `spack env activate .`
       This loads the repository as an [environment](https://spack.readthedocs.io/en/latest/environments.html) and allows you to perform local actions.
@@ -17,8 +17,8 @@
     - Run `spack install`
       This will actually perform the installaion!
 
-The `spack.yaml` in this repository configures a binary cache that lives on GitHub. 
-Spack will attempt to find binary caches for the packages that it installs, 
+The `spack.yaml` in this repository configures a binary cache that lives on GitHub.
+Spack will attempt to find binary caches for the packages that it installs,
 and this can significantly speed up the install process.
 
 > [!WARNING]
