@@ -151,6 +151,75 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+  release_notes:
+    name: Add dependency diff to release body
+    runs-on: ubuntu-latest
+    needs: [build_container]
+    if: startsWith(github.ref, 'refs/tags/')
+    env:
+      # Same canonical lockfile as the PR diff: the default ubuntu24.04 x86_64
+      # build, whose name is compiler-version independent so it diffs cleanly
+      # across releases.
+      CANONICAL_LOCK: spack_linux-ubuntu24.04-x86_64.lock
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Download lockfiles built for this tag
+        uses: actions/download-artifact@v7
+        with:
+          pattern: spack_*-locks
+          merge-multiple: true
+          path: tag-locks
+
+      - name: Resolve previous release and fetch its lockfile
+        id: prev
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Releases are listed newest-first; drop the tag being released so we
+          # compare against the one before it.
+          prev=$(gh release list --exclude-drafts --json tagName -q '.[].tagName' \
+            | grep -v -x "${GITHUB_REF_NAME}" | head -1 || true)
+          echo "tag=$prev" >> "$GITHUB_OUTPUT"
+          if [[ -n "$prev" ]]; then
+            mkdir -p prev-locks
+            gh release download "$prev" --pattern "$CANONICAL_LOCK" --dir prev-locks || true
+          fi
+
+      - name: Build dependency diff
+        run: |
+          old="prev-locks/$CANONICAL_LOCK"
+          new="tag-locks/$CANONICAL_LOCK"
+          {
+            echo "## Dependency changes vs \`${{ steps.prev.outputs.tag }}\`"
+            echo
+            echo "_Canonical lockfile: \`$CANONICAL_LOCK\`_"
+            echo
+            if [[ -f "$old" && -f "$new" ]]; then
+              uv run diff_lockfiles.py "$old" "$new" --markdown
+            elif [[ -f "$new" ]]; then
+              echo "_No previous release lockfile to compare against._"
+            else
+              echo "> Canonical lockfile \`$CANONICAL_LOCK\` not found for this build."
+            fi
+          } > dependency-diff.md
+          cat dependency-diff.md
+
+      - name: Append dependency diff to release body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          # Preserve existing notes but replace any prior dependency section (we
+          # always append it at the end) so re-running the workflow is idempotent.
+          gh release view "$tag" --json body -q .body > body.md || true
+          sed -i '/^## Dependency changes/,$d' body.md
+          { cat body.md; echo; cat dependency-diff.md; } > new_body.md
+          gh release edit "$tag" --notes-file new_body.md
+
   merge_container:
     name: Merge and push container manifests
     runs-on: ubuntu-latest
