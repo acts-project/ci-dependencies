@@ -110,7 +110,7 @@ jobs:
 
   lockfile_diff:
     name: Lockfile diff vs latest release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     needs: [build_container]
     if: ${{ !cancelled() && github.event_name == 'pull_request' }}
     permissions:
@@ -168,7 +168,7 @@ jobs:
 
   release_notes:
     name: Add dependency diff to release body
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     needs: [build_container]
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
