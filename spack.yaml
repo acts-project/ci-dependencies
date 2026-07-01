@@ -1,15 +1,16 @@
 spack:
   specs:
     - boost@1.90.0 +program_options +test +json +graph +filesystem
-    - cmake@4.2
+    - cmake@4.3.3
+    - ccache@4.12
     - edm4hep@1.0
     - eigen@5.0.1
-    - intel-tbb@2022.3.0
+    - intel-tbb@2023.0.0
     - nlohmann-json@3.12.0
     - podio@1.7
-    - root@6.38.04 -aqua -opengl -cxxmodules
-    - dd4hep@1.35 +xercesc +edm4hep +hepmc3
-    - geomodel@6.24.0 +geomodelg4
+    - root@6.40.02 -aqua -opengl -cxxmodules
+    - dd4hep@1.37 +xercesc +edm4hep +hepmc3
+    - geomodel@6.27.0 +geomodelg4
     - python@3.14
     - py-pybind11 @3.0.2
     - py-pip
@@ -17,8 +18,8 @@ spack:
     - py-pyyaml # for edm4hep + podio
 
     - hepmc3@3.3.1 +rootio
-    # compression libraries that can be used by hepmc3 if configured
-    - zstd
+      # compression libraries that can be used by hepmc3 if configured
+    - zstd build_system=cmake
     - lz4
     - zlib-ng
     - bzip2
@@ -28,13 +29,18 @@ spack:
 
     - pythia8@8.317 -hepmc +hepmc3
     - geant4@11.4.1 -data
-    - fastjet@3.5.0 plugins=cxx
+    - fastjet@3.5.1 plugins=cxx
 
     - onnxruntime-bin@1.24.4
 
     - millepede@5 +root
     - mille@1 +root
     - generalbrokenlines@4 +root
+
+    - googletest@1.17.0
+      # perf counters only supported on linux
+    - benchmark@1.9.5
+    - arrow@23.0.1 +bz2 +parquet +zlib +zstd +dataset +filesystem +compute +snappy +brotli +python
   packages:
     all:
       target:
@@ -43,6 +49,9 @@ spack:
       variants: build_type=Release
     mesa:
       buildable: false
+    xxhash:
+      require:
+      - +pic
 
   concretizer:
     unify: true

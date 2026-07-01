@@ -1,0 +1,21 @@
+rules:
+  # Require every action to be pinned to a full commit SHA. Tags/refs are
+  # mutable, so a tag pin can silently change underneath us. Dependabot
+  # (.github/dependabot.yml) keeps the SHA pins fresh so they don't rot.
+  unpinned-uses:
+    config:
+      policies:
+        "*": hash-pin
+
+  # setup-uv enables its cache by default; the poisoning risk is low-confidence
+  # here and disabling the cache would noticeably slow every build.
+  cache-poisoning:
+    ignore:
+      - build.yml
+      - build_one.yml
+
+  # softprops/action-gh-release is intentionally preferred over a raw `gh release`
+  # script step for its release-asset handling.
+  superfluous-actions:
+    ignore:
+      - build_one.yml

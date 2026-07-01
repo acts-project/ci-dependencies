@@ -43,15 +43,17 @@ jobs:
       target_triplet_slug: ${{ steps.lockfile_bookkeeping.outputs.TARGET_TRIPLET_SLUG }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.14"
 
       - name: Set up Spack
-        uses: spack/setup-spack@v2
+        uses: spack/setup-spack@16b756799ede8b28951287f89bcd3fdb32ec1ca3 # v3.0.0
 
       - name: Apply spack patches
         run: |
@@ -80,19 +82,28 @@ jobs:
       #     xcode-version: "${{ inputs.xcode }}"
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
 
       - name: Setup Xcode version
         if: startsWith(inputs.os, 'macos')
+        env:
+          XCODE: ${{ inputs.xcode }}
         run: |
           uv run xcode_manager.py list-versions
-          uv run xcode_manager.py select ${{ inputs.xcode }} --cleanup
+          uv run xcode_manager.py select "$XCODE" --cleanup
           # Cross check, other xcodes should be gone now
           uv run xcode_manager.py list-versions
 
 
       - name: Run spack build (container)
         if: "${{ inputs.image != '' }}"
+        env:
+          COMPILER: ${{ inputs.compiler }}
+          COMPILER_PATH: ${{ inputs.compiler_path }}
+          CXXSTD: ${{ inputs.cxxstd }}
+          IMAGE: ${{ inputs.image }}
+          GH_OCI_USER: ${{ github.actor }}
+          GH_OCI_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir build
           docker run \
@@ -101,26 +112,27 @@ jobs:
             -v"$PWD/build:/build" \
             -v "$GITHUB_ENV:/github_env"\
             -e "SPACK_ROOT=/spack" \
-            -e "COMPILER=${{ inputs.compiler }}" \
-            -e "COMPILER_PATH=${{ inputs.compiler_path }}" \
-            -e "CXXSTD=${{ inputs.cxxstd }}" \
-            -e "GH_OCI_USER=${{ github.actor }}" \
-            -e "GH_OCI_TOKEN=${{ secrets.GITHUB_TOKEN }}" \
+            -e "COMPILER=$COMPILER" \
+            -e "COMPILER_PATH=$COMPILER_PATH" \
+            -e "CXXSTD=$CXXSTD" \
+            -e "GH_OCI_USER=$GH_OCI_USER" \
+            -e "GH_OCI_TOKEN=$GH_OCI_TOKEN" \
             -e "GITHUB_ENV=/github_env" \
             -e "GITHUB_ACTIONS=${GITHUB_ACTIONS}" \
             -w /build \
-            ${{ inputs.image }} \
+            "$IMAGE" \
             /src/spack_build.sh
 
       - name: Run spack build (host)
         if: "${{ inputs.image == '' }}"
+        env:
+          COMPILER: ${{ inputs.compiler }}
+          CXXSTD: ${{ inputs.cxxstd }}
+          COMPILER_PATH: ${{ inputs.compiler_path }}
+          GH_OCI_USER: ${{ github.actor }}
+          GH_OCI_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          export COMPILER=${{ inputs.compiler }}
-          export CXXSTD=${{ inputs.cxxstd }}
           export SPACK_ROOT=$(spack location -r)
-          export COMPILER_PATH="${{ inputs.compiler_path }}"
-          export GH_OCI_USER="${{ github.actor }}"
-          export GH_OCI_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           mkdir build
           pushd build
           ../spack_build.sh
@@ -143,12 +155,15 @@ jobs:
       - name: Derive base image
         shell: bash
         if: "!cancelled()"
+        env:
+          IMAGE: ${{ inputs.image }}
+          OS: ${{ inputs.os }}
         run: |
-          if [[ "${{ inputs.image }}" != "" ]]; then
-            echo BASE_IMAGE="${{ inputs.image }}" >> "$GITHUB_ENV"
-          elif [[ "${{ inputs.os }}" == "ubuntu-22.04" ]]; then
+          if [[ "$IMAGE" != "" ]]; then
+            echo BASE_IMAGE="$IMAGE" >> "$GITHUB_ENV"
+          elif [[ "$OS" == "ubuntu-22.04" ]]; then
             echo BASE_IMAGE="ubuntu:22.04" >> "$GITHUB_ENV"
-          elif [[ "${{ inputs.os }}" == "ubuntu-24.04" ]]; then
+          elif [[ "$OS" == "ubuntu-24.04" ]]; then
             echo BASE_IMAGE="ubuntu:24.04" >> "$GITHUB_ENV"
           else
             echo BASE_IMAGE="ubuntu:24.04" >> "$GITHUB_ENV"
@@ -169,7 +184,7 @@ jobs:
             -o Dockerfile.${TARGET_TRIPLET}
 
       - name: Upload lock files and Dockerfiles
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: spack_${{ env.TARGET_TRIPLET }}-locks
@@ -179,7 +194,7 @@ jobs:
           if-no-files-found: error
 
       - name: Add lock files and Dockerfiles to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
@@ -188,6 +203,10 @@ jobs:
 
       - name: Push spack cache (container)
         if: "inputs.image != '' && !cancelled()"
+        env:
+          IMAGE: ${{ inputs.image }}
+          GH_OCI_USER: ${{ github.actor }}
+          GH_OCI_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           docker run \
             -v"$PWD:/src" \
@@ -195,11 +214,11 @@ jobs:
             -v"$PWD/build:/build" \
             -e "SPACK_ROOT=/spack" \
             -e "GITHUB_ACTIONS=${GITHUB_ACTIONS}" \
-            -e "GH_OCI_USER=${{ github.actor }}" \
-            -e "GH_OCI_TOKEN=${{ secrets.GITHUB_TOKEN }}" \
+            -e "GH_OCI_USER=$GH_OCI_USER" \
+            -e "GH_OCI_TOKEN=$GH_OCI_TOKEN" \
             -e "BASE_IMAGE=${BASE_IMAGE}" \
             -w /build \
-            ${{ inputs.image }} \
+            "$IMAGE" \
             /src/spack_push.sh
 
       - name: Push spack cache (host)
@@ -225,7 +244,9 @@ jobs:
       TARGET_TRIPLET_SLUG: ${{ needs.build.outputs.target_triplet_slug }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Remove packages to save disk
         if: startsWith(inputs.os, 'ubuntu')
@@ -237,14 +258,14 @@ jobs:
           df -h
 
       - name: Download all workflow run artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: spack_${{ env.TARGET_TRIPLET }}-locks
 
       - run: |
           cp Dockerfile.* Dockerfile
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         if: "inputs.image != '' && !cancelled()"
         with:
           registry: ghcr.io
@@ -253,7 +274,7 @@ jobs:
 
       - name: Docker meta
         if: "inputs.image != '' && !cancelled()"
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
         id: meta
         with:
           # list of Docker images to use as base name for tags
@@ -270,7 +291,7 @@ jobs:
 
       - name: Build and push
         if: "inputs.image != '' && !cancelled()"
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           # Push only on tags
           push: ${{ startsWith(github.ref, 'refs/tags/') }}

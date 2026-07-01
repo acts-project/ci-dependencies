@@ -11,9 +11,14 @@ on:
   schedule:
     - cron: "5 4 * * *"
 
+permissions: {}
+
 jobs:
   build_macos:
     name: macos ${{ matrix.os }} · Xcode ${{ matrix.xcode }} · ${{ matrix.compiler }}
+    permissions:
+      contents: write
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -35,47 +40,68 @@ jobs:
       xcode: ${{ matrix.xcode }}
       compiler: ${{ matrix.compiler }}
       default: ${{ matrix.default }}
-    secrets: inherit
 
   build_container:
-    name: ${{ matrix.compiler }}${{ matrix.cxxstd == '23' && ' (C++23)' || '' }} · ${{ matrix.os }}
+    name: ${{ matrix.label }} · ${{ matrix.compiler }}${{ matrix.cxxstd == '23' && ' (C++23)' || '' }}
+    permissions:
+      contents: write
+      packages: write
     strategy:
       fail-fast: false
       matrix:
 
         include:
-          - image: ghcr.io/acts-project/alma9-base:85
-            compiler: gcc@15.1.1
+          - image: ghcr.io/acts-project/alma9-base:87
+            label: alma9
+            compiler: gcc@15.2.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404:85
+          - image: ghcr.io/acts-project/ubuntu2404:87
+            label: ubuntu24.04
             compiler: gcc@13.3.0
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang22:85
-            compiler: llvm@22.1.1
+          - image: ghcr.io/acts-project/ubuntu2404_clang22:87
+            label: ubuntu24.04-clang22
+            compiler: llvm@22.1.7
             os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404:85
+          - image: ghcr.io/acts-project/ubuntu2404:87
+            label: ubuntu24.04-arm
             compiler: gcc@13.3.0
             os: ubuntu-24.04-arm
             default: false
 
-          - image: ghcr.io/acts-project/alma9-base:85
-            compiler: gcc@15.1.1
+          - image: ghcr.io/acts-project/alma9-base:87
+            label: alma9
+            compiler: gcc@15.2.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             cxxstd: "23"
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang22:85
-            compiler: llvm@22.1.1
+          - image: ghcr.io/acts-project/ubuntu2404_clang22:87
+            label: ubuntu24.04-clang22
+            compiler: llvm@22.1.7
             os: ubuntu-latest
             cxxstd: "23"
+            default: false
+
+          - image: ghcr.io/acts-project/alma10-base:87
+            label: alma10
+            compiler: gcc@15.2.1
+            compiler_path: "/opt/rh/gcc-toolset-15/root"
+            os: ubuntu-latest
+            default: false
+
+          - image: ghcr.io/acts-project/ubuntu2604:87
+            label: ubuntu26.04
+            compiler: gcc@15.2.0
+            os: ubuntu-latest
             default: false
 
     uses: ./.github/workflows/build_one.yml
@@ -86,22 +112,160 @@ jobs:
       compiler_path: ${{ matrix.compiler_path || '' }}
       cxxstd: ${{ matrix.cxxstd || '20' }}
       default: ${{ matrix.default }}
-    secrets: inherit
+
+  lockfile_diff:
+    name: Lockfile diff vs latest release
+    runs-on: ubuntu-slim
+    needs: [build_container]
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    permissions:
+      contents: read   # gh release view/download
+      actions: read    # download-artifact from this run
+    env:
+      # Canonical lockfile to compare: the default ubuntu24.04 x86_64 build,
+      # which matches the published spack-container image. The name is
+      # compiler-version independent, so it diffs cleanly across releases.
+      CANONICAL_LOCK: spack_linux-ubuntu24.04-x86_64.lock
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Download lockfiles built in this PR
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: spack_*-locks
+          merge-multiple: true
+          path: pr-locks
+
+      - name: Fetch canonical lockfile from latest release
+        id: release_lock
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag=$(gh release view --json tagName -q .tagName)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          mkdir -p release-locks
+          gh release download "$tag" \
+            --pattern "$CANONICAL_LOCK" \
+            --dir release-locks
+
+      - name: Diff lockfiles into job summary
+        env:
+          PREV_TAG: ${{ steps.release_lock.outputs.tag }}
+        run: |
+          old="release-locks/$CANONICAL_LOCK"
+          new="pr-locks/$CANONICAL_LOCK"
+          {
+            echo "## Dependency changes vs \`$PREV_TAG\`"
+            echo
+            echo "_Canonical lockfile: \`$CANONICAL_LOCK\`_"
+            echo
+            if [[ -f "$old" && -f "$new" ]]; then
+              uv run diff_lockfiles.py "$old" "$new" --markdown
+            else
+              echo "> Could not locate both lockfiles (old: \`$old\`, new: \`$new\`); skipping diff."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release_notes:
+    name: Add dependency diff to release body
+    runs-on: ubuntu-slim
+    needs: [build_container]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write  # gh release edit (write release body)
+      actions: read    # download-artifact from this run
+    env:
+      # Same canonical lockfile as the PR diff: the default ubuntu24.04 x86_64
+      # build, whose name is compiler-version independent so it diffs cleanly
+      # across releases.
+      CANONICAL_LOCK: spack_linux-ubuntu24.04-x86_64.lock
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Download lockfiles built for this tag
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: spack_*-locks
+          merge-multiple: true
+          path: tag-locks
+
+      - name: Resolve previous release and fetch its lockfile
+        id: prev
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Releases are listed newest-first; drop the tag being released so we
+          # compare against the one before it.
+          prev=$(gh release list --exclude-drafts --json tagName -q '.[].tagName' \
+            | grep -v -x "${GITHUB_REF_NAME}" | head -1 || true)
+          echo "tag=$prev" >> "$GITHUB_OUTPUT"
+          if [[ -n "$prev" ]]; then
+            mkdir -p prev-locks
+            gh release download "$prev" --pattern "$CANONICAL_LOCK" --dir prev-locks || true
+          fi
+
+      - name: Build dependency diff
+        env:
+          PREV_TAG: ${{ steps.prev.outputs.tag }}
+        run: |
+          old="prev-locks/$CANONICAL_LOCK"
+          new="tag-locks/$CANONICAL_LOCK"
+          {
+            echo "## Dependency changes vs \`$PREV_TAG\`"
+            echo
+            echo "_Canonical lockfile: \`$CANONICAL_LOCK\`_"
+            echo
+            if [[ -f "$old" && -f "$new" ]]; then
+              uv run diff_lockfiles.py "$old" "$new" --markdown
+            elif [[ -f "$new" ]]; then
+              echo "_No previous release lockfile to compare against._"
+            else
+              echo "> Canonical lockfile \`$CANONICAL_LOCK\` not found for this build."
+            fi
+          } > dependency-diff.md
+          cat dependency-diff.md
+
+      - name: Append dependency diff to release body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          # Preserve existing notes but replace any prior dependency section (we
+          # always append it at the end) so re-running the workflow is idempotent.
+          gh release view "$tag" --json body -q .body > body.md || true
+          sed -i '/^## Dependency changes/,$d' body.md
+          { cat body.md; echo; cat dependency-diff.md; } > new_body.md
+          gh release edit "$tag" --notes-file new_body.md
 
   merge_container:
     name: Merge and push container manifests
     runs-on: ubuntu-latest
     needs: [build_container]
     if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "latest"
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -110,5 +274,6 @@ jobs:
       - name: Build merged manifest and push to regisrty
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          uv run merge_images.py ${{ github.ref_name }} ".*ubuntu24.04.*gcc.*" --push
+          uv run merge_images.py "$REF_NAME" ".*ubuntu24.04.*gcc.*" --push

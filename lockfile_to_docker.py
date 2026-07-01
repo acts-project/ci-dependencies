@@ -119,9 +119,9 @@ EOF
 
 RUN cat <<EOF >> /etc/motd
 =============== ACTS development image with dependencies ===============
-- Clone repository: 
+- Clone repository:
     git clone https://github.com/acts-project/acts.git --recursive
-- Configure: 
+- Configure:
     cmake -S acts -B build -GNinja --preset dev \\
       -DACTS_BUILD_UNITTESTS=OFF -DACTS_BUILD_INTEGRATIONTESTS=OFF
 - Build:
