@@ -49,6 +49,9 @@ spack:
       variants: build_type=Release
     mesa:
       buildable: false
+    xxhash:
+      require:
+      - +pic
 
   concretizer:
     unify: true
