@@ -8,7 +8,7 @@ spack:
     - intel-tbb@2023.0.0
     - nlohmann-json@3.12.0
     - podio@1.7
-    - root@6.38.06 -aqua -opengl -cxxmodules
+    - root@6.40.02 -aqua -opengl -cxxmodules
     - dd4hep@1.37 +xercesc +edm4hep +hepmc3
     - geomodel@6.27.0 +geomodelg4
     - python@3.14
@@ -49,6 +49,9 @@ spack:
       variants: build_type=Release
     mesa:
       buildable: false
+    xxhash:
+      require:
+      - +pic
 
   concretizer:
     unify: true
