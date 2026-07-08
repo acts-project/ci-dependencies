@@ -15,7 +15,7 @@ permissions: {}
 
 jobs:
   build_macos:
-    name: macos ${{ matrix.os }} · ${{ matrix.compiler }}
+    name: macos ${{ matrix.os }} · ${{ matrix.compiler }}${{ matrix.cxxstd == '23' && ' (C++23)' || '' }}
     permissions:
       contents: write
       packages: write
@@ -29,11 +29,18 @@ jobs:
            compiler: "apple-clang@17.0.0"
            default: true
 
+         - os: macos-26
+           xcode: "26.3"
+           compiler: "apple-clang@17.0.0"
+           cxxstd: "23"
+           default: false
+
     uses: ./.github/workflows/build_one.yml
     with:
       os: ${{ matrix.os }}
       xcode: ${{ matrix.xcode }}
       compiler: ${{ matrix.compiler }}
+      cxxstd: ${{ matrix.cxxstd || '20' }}
       default: ${{ matrix.default }}
 
   build_container:
@@ -59,6 +66,13 @@ jobs:
             os: ubuntu-latest
             default: true
 
+          - image: ghcr.io/acts-project/ubuntu2404:87
+            label: ubuntu24.04
+            compiler: gcc@13.3.0
+            os: ubuntu-latest
+            cxxstd: "23"
+            default: false
+
           - image: ghcr.io/acts-project/ubuntu2404_clang22:87
             label: ubuntu24.04-clang22
             compiler: llvm@22.1.7
@@ -69,6 +83,13 @@ jobs:
             label: ubuntu24.04-arm
             compiler: gcc@13.3.0
             os: ubuntu-24.04-arm
+            default: false
+
+          - image: ghcr.io/acts-project/ubuntu2404:87
+            label: ubuntu24.04-arm
+            compiler: gcc@13.3.0
+            os: ubuntu-24.04-arm
+            cxxstd: "23"
             default: false
 
           - image: ghcr.io/acts-project/alma9-base:87
@@ -93,10 +114,25 @@ jobs:
             os: ubuntu-latest
             default: false
 
+          - image: ghcr.io/acts-project/alma10-base:87
+            label: alma10
+            compiler: gcc@15.2.1
+            compiler_path: "/opt/rh/gcc-toolset-15/root"
+            os: ubuntu-latest
+            cxxstd: "23"
+            default: false
+
           - image: ghcr.io/acts-project/ubuntu2604:87
             label: ubuntu26.04
             compiler: gcc@15.2.0
             os: ubuntu-latest
+            default: false
+
+          - image: ghcr.io/acts-project/ubuntu2604:87
+            label: ubuntu26.04
+            compiler: gcc@15.2.0
+            os: ubuntu-latest
+            cxxstd: "23"
             default: false
 
     uses: ./.github/workflows/build_one.yml
