@@ -60,18 +60,15 @@ jobs:
             os: ubuntu-latest
             default: true
 
+          # No C++23 variant: gcc@13.3.0's -std=c++23 reports the provisional
+          # __cplusplus draft value rather than the final 202302L (fixed in
+          # gcc 14+), which sends dd4hep's OpaqueDataBlock ctor down a code
+          # path that fails to compile with this compiler.
           - image: ghcr.io/acts-project/ubuntu2404:87
             label: ubuntu24.04
             compiler: gcc@13.3.0
             os: ubuntu-latest
             default: true
-
-          - image: ghcr.io/acts-project/ubuntu2404:87
-            label: ubuntu24.04
-            compiler: gcc@13.3.0
-            os: ubuntu-latest
-            cxxstd: "23"
-            default: false
 
           - image: ghcr.io/acts-project/ubuntu2404_clang22:87
             label: ubuntu24.04-clang22
@@ -83,13 +80,6 @@ jobs:
             label: ubuntu24.04-arm
             compiler: gcc@13.3.0
             os: ubuntu-24.04-arm
-            default: false
-
-          - image: ghcr.io/acts-project/ubuntu2404:87
-            label: ubuntu24.04-arm
-            compiler: gcc@13.3.0
-            os: ubuntu-24.04-arm
-            cxxstd: "23"
             default: false
 
           - image: ghcr.io/acts-project/alma9-base:87
