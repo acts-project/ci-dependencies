@@ -49,6 +49,15 @@ spack:
       variants: build_type=Release
     mesa:
       buildable: false
+    flex:
+      # spack marks flex@2.6.3 as `preferred`, so it wins over the newer 2.6.4.
+      # 2.6.3 ships a libtool 2.4.6 whose configure only knows deployment targets
+      # `10.[012]` and `10.*`, so on macOS >= 11 it picks no allow-undefined flag
+      # and linking libfl.dylib fails on the (intentionally) undefined `yylex`.
+      # spack autoreconf's 2.6.4 with a modern libtool, which gets this right, and
+      # patches the gcc/glibc issue that made 2.6.3 preferred in the first place.
+      require:
+      - "@2.6.4"
     xxhash:
       require:
       - +pic
