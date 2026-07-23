@@ -1,15 +1,21 @@
 # Extra specs for the `cuda90` flavor (one per line; `#` comments allowed).
-# Added via `spack add` on top of the base environment. VALIDATE with
-# `spack concretize -Uf` before enabling in CI — some of these may require a
-# custom package.py under spack_repo/acts/packages/.
+# Added via `spack add` on top of the base environment. cuda_arch=90 comes from
+# flavors/cuda90.yaml.
 
 # CUDA toolkit, provided by Spack (no vendor base image needed). The build only
 # needs nvcc/headers; no physical GPU is required to compile.
 cuda@12.6.2
 
-# traccc GPU tracking R&D stack. cuda_arch=90 comes from flavors/cuda90.yaml.
+# traccc GPU tracking R&D stack. Only the packages Spack actually resolves are
+# enabled below; the rest are staged behind for a follow-up once their package
+# names / custom package.py under spack_repo/acts/packages/ are sorted out.
 vecmem +cuda
 covfie +cuda
-algebra-plugins +vc
-detray +cuda
-traccc +cuda
+
+# TODO(gpu): re-add once package names are validated against the pinned Spack —
+# `algebra-plugins` errored as "no such package" (aborting before detray/traccc
+# were even reached). These likely need custom packages under
+# spack_repo/acts/packages/ or a different upstream name.
+#   algebra-plugins +vc
+#   detray +cuda
+#   traccc +cuda
