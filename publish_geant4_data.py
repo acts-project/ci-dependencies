@@ -102,25 +102,49 @@ def parse_dataset_dirs(config_path: Path) -> list[str]:
     return dirs
 
 
+def cvmfs_version_candidates(version: str) -> list[str]:
+    """Candidate CVMFS geant4 directory names for a spack semver.
+
+    Geant4's CVMFS tree names releases as ``X.Y`` for the ``.0`` release and
+    ``X.Y.pNN`` (zero-padded patch) for patch releases, e.g. spack ``11.4.1``
+    -> ``11.4.p01`` and ``11.4.0`` -> ``11.4``. The dataset list is identical
+    across a minor series, but we match the exact patch anyway.
+    """
+    candidates = [version]
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)$", version)
+    if match:
+        major, minor, patch = match.groups()
+        if int(patch) == 0:
+            candidates.append(f"{major}.{minor}")
+        candidates.append(f"{major}.{minor}.p{int(patch):02d}")
+        candidates.append(f"{major}.{minor}.p{patch}")
+    # Preserve order, drop duplicates.
+    seen: set[str] = set()
+    return [c for c in candidates if not (c in seen or seen.add(c))]
+
+
 def find_geant4_config(cvmfs_root: Path, version: str) -> Path:
-    """Locate a geant4-config for ``version`` under a CVMFS-style tree."""
-    patterns = [
-        f"geant4/{version}/*/bin/geant4-config",
-        f"geant4/{version}/bin/geant4-config",
-        f"geant4/{version}/*/*/bin/geant4-config",
-    ]
-    for pattern in patterns:
-        matches = sorted(cvmfs_root.glob(pattern))
+    """Locate a geant4-config for ``version`` under a CVMFS-style tree.
+
+    The dataset list is platform-independent, so the first geant4-config found
+    under the matching version directory (across platform subdirs) is used.
+    """
+    geant4_dir = cvmfs_root / "geant4"
+    for candidate in cvmfs_version_candidates(version):
+        version_dir = geant4_dir / candidate
+        if not version_dir.is_dir():
+            continue
+        matches = sorted(version_dir.rglob("bin/geant4-config"))
         if matches:
             return matches[0]
 
     console.print(
         f"[red]Error: no geant4-config found for version {version} "
-        f"under {cvmfs_root}[/red]"
+        f"(tried {cvmfs_version_candidates(version)}) under {geant4_dir}[/red]"
     )
-    available = sorted(p.name for p in (cvmfs_root / "geant4").glob("*")) if (
-        cvmfs_root / "geant4"
-    ).is_dir() else []
+    available = (
+        sorted(p.name for p in geant4_dir.glob("*")) if geant4_dir.is_dir() else []
+    )
     if available:
         console.print(f"[yellow]Available geant4 versions: {available}[/yellow]")
     raise typer.Exit(1)
