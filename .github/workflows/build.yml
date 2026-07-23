@@ -99,6 +99,22 @@ jobs:
             os: ubuntu-latest
             default: false
 
+          # GPU flavors: overlay the traccc stack from flavors/<flavor>.{yaml,specs}
+          # onto the base env. Spack provides the toolkit, so the standard base
+          # images are reused. Keep `default: false` so they never overwrite the
+          # per-arch canonical lockfile. This is the first CI run of the cuda90
+          # flavor — the specs are unvalidated, so this entry is expected to be
+          # shaken out (missing packages may need a package.py under spack_repo).
+          - image: ghcr.io/acts-project/ubuntu2404:87
+            label: ubuntu24.04-cuda90
+            compiler: gcc@13.3.0
+            os: ubuntu-latest
+            flavor: cuda90
+            default: false
+
+          # ROCm flavor is scaffolded (flavors/rocm-gfx90a.*) but intentionally
+          # left disabled until CUDA is proven out; add a matrix entry to enable.
+
     uses: ./.github/workflows/build_one.yml
     with:
       os: ${{ matrix.os }}
@@ -106,6 +122,7 @@ jobs:
       compiler: ${{ matrix.compiler }}
       compiler_path: ${{ matrix.compiler_path || '' }}
       cxxstd: ${{ matrix.cxxstd || '20' }}
+      flavor: ${{ matrix.flavor || 'host' }}
       default: ${{ matrix.default }}
 
   lockfile_diff:

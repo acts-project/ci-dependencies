@@ -1,0 +1,8 @@
+# Spack config overlay for the `rocm-gfx90a` flavor (AMD, gfx90a / MI200).
+# Merged into the environment via `spack config add -f`. Config sections only —
+# specs live in flavors/rocm-gfx90a.specs. Express deltas from the base spack.yaml.
+packages:
+  all:
+    # Applied only to packages that define an `amdgpu_target` variant; others
+    # ignore it, so it is safe as an `all` entry.
+    variants: [amdgpu_target=gfx90a]
