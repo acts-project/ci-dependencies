@@ -1,0 +1,13 @@
+# Spack config overlay for the `cuda90` flavor (NVIDIA, sm_90 / Hopper).
+# Merged into the environment via `spack config add -f`. Config sections only —
+# specs live in flavors/cuda90.specs. Express deltas from the base spack.yaml.
+packages:
+  all:
+    # Applied only to packages that actually define a `cuda_arch` variant;
+    # packages without it silently ignore this, so it is safe as an `all` entry.
+    variants: [cuda_arch=90]
+  # ONNX Runtime CUDA execution provider. The current `onnxruntime-bin` is a
+  # prebuilt CPU package; a GPU build likely needs its own variant or a source
+  # `onnxruntime +cuda`. Enable once that package path exists.
+  # onnxruntime-bin:
+  #   require: ["+cuda"]
