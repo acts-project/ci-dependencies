@@ -1,0 +1,16 @@
+# Extra specs for the `rocm-gfx90a` flavor (one per line; `#` comments allowed).
+# Added via `spack add` on top of the base environment. VALIDATE with
+# `spack concretize -Uf` before enabling in CI. ROCm in Spack is heavier than
+# CUDA and several of these backends need confirmation for AMD.
+
+# ROCm/HIP toolchain, provided by Spack. amdgpu_target comes from the .yaml.
+hip
+
+# traccc GPU tracking R&D stack, HIP backend. NOTE: confirm which of detray/
+# traccc actually expose a working +hip/ROCm backend before enabling; this is a
+# template, not a validated configuration.
+vecmem +hip
+covfie +hip
+algebra-plugins +vc
+detray +hip
+traccc +hip

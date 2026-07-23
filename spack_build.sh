@@ -41,6 +41,13 @@ if [ -z "${CXXSTD:-}" ]; then
     exit 1
 fi
 
+# Accelerator flavor: `host` (default) builds the plain CPU stack and is a no-op
+# below. A non-host value (e.g. `cuda90`, `rocm-gfx90a`) overlays the matching
+# fragments under flavors/ onto the base environment and is appended to
+# TARGET_TRIPLET so all downstream artifacts (lockfile, Dockerfile, image tag,
+# buildcache) are namespaced automatically.
+FLAVOR="${FLAVOR:-host}"
+
 
 # --- TEMPORARY: provide crypt.h for ROOT's net/auth on newer Ubuntu images ---
 # glibc no longer ships <crypt.h>; it now comes from libxcrypt (libcrypt-dev).
@@ -78,6 +85,34 @@ fi
 # across reused build directories — matching CI, which always starts fresh.
 cp "$SCRIPT_DIR"/spack.yaml ./spack.yaml
 # spack -e . mirror set --autopush acts-spack-buildcache
+end_section
+
+start_section "Apply accelerator flavor: $FLAVOR"
+if [ "$FLAVOR" = "host" ]; then
+  echo "host flavor: no overlay applied"
+else
+  flavor_cfg="$SCRIPT_DIR/flavors/${FLAVOR}.yaml"
+  flavor_specs="$SCRIPT_DIR/flavors/${FLAVOR}.specs"
+  if [ ! -f "$flavor_cfg" ] && [ ! -f "$flavor_specs" ]; then
+    echo "ERROR: unknown flavor '$FLAVOR' (no flavors/${FLAVOR}.yaml or .specs)" >&2
+    exit 1
+  fi
+  # Merge the config delta (packages:/concretizer:/... sections) into the env.
+  if [ -f "$flavor_cfg" ]; then
+    echo "Merging config overlay $flavor_cfg"
+    spack -e . config add -f "$flavor_cfg"
+  fi
+  # Add the extra specs, one per line; `#` comments and blank lines are ignored.
+  if [ -f "$flavor_specs" ]; then
+    while IFS= read -r line; do
+      line="${line%%#*}"
+      line="$(echo "$line" | xargs)"
+      [ -n "$line" ] || continue
+      echo "Adding spec: $line"
+      spack -e . add "$line"
+    done < "$flavor_specs"
+  fi
+fi
 end_section
 
 start_section "List visible compilers"
@@ -166,4 +201,10 @@ function set_env {
 }
 
 set_env TARGET_ARCH "$(spack arch --family)"
-set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${CXXSTD}"
+# `host` keeps the historical 3-token triplet byte-for-byte; any other flavor
+# adds a fourth token so its artifacts never collide with the CPU stack.
+if [ "$FLAVOR" = "host" ]; then
+  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${CXXSTD}"
+else
+  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${CXXSTD}_${FLAVOR}"
+fi

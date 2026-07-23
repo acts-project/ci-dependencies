@@ -26,6 +26,10 @@ on:
         required: false
         type: string
         default: "20"
+      flavor:
+        required: false
+        type: string
+        default: "host"
       default:
         required: false
         type: boolean
@@ -101,6 +105,7 @@ jobs:
           COMPILER: ${{ inputs.compiler }}
           COMPILER_PATH: ${{ inputs.compiler_path }}
           CXXSTD: ${{ inputs.cxxstd }}
+          FLAVOR: ${{ inputs.flavor }}
           IMAGE: ${{ inputs.image }}
           GH_OCI_USER: ${{ github.actor }}
           GH_OCI_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -115,6 +120,7 @@ jobs:
             -e "COMPILER=$COMPILER" \
             -e "COMPILER_PATH=$COMPILER_PATH" \
             -e "CXXSTD=$CXXSTD" \
+            -e "FLAVOR=$FLAVOR" \
             -e "GH_OCI_USER=$GH_OCI_USER" \
             -e "GH_OCI_TOKEN=$GH_OCI_TOKEN" \
             -e "GITHUB_ENV=/github_env" \
@@ -129,6 +135,7 @@ jobs:
           COMPILER: ${{ inputs.compiler }}
           CXXSTD: ${{ inputs.cxxstd }}
           COMPILER_PATH: ${{ inputs.compiler_path }}
+          FLAVOR: ${{ inputs.flavor }}
           GH_OCI_USER: ${{ github.actor }}
           GH_OCI_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
