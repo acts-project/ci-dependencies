@@ -242,6 +242,58 @@ jobs:
           { cat body.md; echo; cat dependency-diff.md; } > new_body.md
           gh release edit "$tag" --notes-file new_body.md
 
+  publish_geant4_data:
+    name: Publish Geant4 data to GHCR
+    runs-on: ubuntu-latest
+    # Sources both the required dataset list (geant4-config) and the data bytes
+    # from CVMFS, so it is independent of the build matrix. Skip on PRs: they
+    # can come from forks and must not mutate the registry.
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Mount CVMFS
+        uses: cvmfs-contrib/github-action-cvmfs@10197e000cc0add8e54ac4fb73d3ed44e2de72b4 # v5.5
+        with:
+          cvmfs_repositories: geant4.cern.ch
+
+      - name: Set up ORAS
+        uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6 # v1.2.4
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+        run: |
+          echo "${GITHUB_TOKEN}" | oras login ghcr.io -u "${GH_ACTOR}" --password-stdin
+
+      - name: Resolve pinned Geant4 version
+        id: g4
+        run: |
+          version=$(grep -oE 'geant4@[0-9]+\.[0-9]+(\.[0-9]+)?' spack.yaml | head -1 | cut -d@ -f2)
+          if [ -z "$version" ]; then
+            echo "Could not determine geant4 version from spack.yaml" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Geant4 version: $version"
+
+      - name: Ensure datasets are mirrored
+        env:
+          G4_VERSION: ${{ steps.g4.outputs.version }}
+        run: |
+          uv run publish_geant4_data.py \
+            --geant4-version "$G4_VERSION" \
+            --jobs 4
+
   merge_container:
     name: Merge and push container manifests
     runs-on: ubuntu-latest
