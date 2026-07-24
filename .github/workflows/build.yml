@@ -15,7 +15,7 @@ permissions: {}
 
 jobs:
   build_macos:
-    name: macos ${{ matrix.os }} · ${{ matrix.compiler }}
+    name: macos ${{ matrix.os }} · ${{ matrix.compiler }}${{ matrix.cxxstd == '23' && ' (C++23)' || '' }}
     permissions:
       contents: write
       packages: write
@@ -29,11 +29,18 @@ jobs:
            compiler: "apple-clang@17.0.0"
            default: true
 
+         - os: macos-26
+           xcode: "26.3"
+           compiler: "apple-clang@17.0.0"
+           cxxstd: "23"
+           default: false
+
     uses: ./.github/workflows/build_one.yml
     with:
       os: ${{ matrix.os }}
       xcode: ${{ matrix.xcode }}
       compiler: ${{ matrix.compiler }}
+      cxxstd: ${{ matrix.cxxstd || '20' }}
       default: ${{ matrix.default }}
 
   build_container:
@@ -53,6 +60,10 @@ jobs:
             os: ubuntu-latest
             default: true
 
+          # No C++23 variant: gcc@13.3.0's -std=c++23 reports the provisional
+          # __cplusplus draft value rather than the final 202302L (fixed in
+          # gcc 14+), which sends dd4hep's OpaqueDataBlock ctor down a code
+          # path that fails to compile with this compiler.
           - image: ghcr.io/acts-project/ubuntu2404:87
             label: ubuntu24.04
             compiler: gcc@13.3.0
@@ -93,10 +104,25 @@ jobs:
             os: ubuntu-latest
             default: false
 
+          - image: ghcr.io/acts-project/alma10-base:87
+            label: alma10
+            compiler: gcc@15.2.1
+            compiler_path: "/opt/rh/gcc-toolset-15/root"
+            os: ubuntu-latest
+            cxxstd: "23"
+            default: false
+
           - image: ghcr.io/acts-project/ubuntu2604:87
             label: ubuntu26.04
             compiler: gcc@15.2.0
             os: ubuntu-latest
+            default: false
+
+          - image: ghcr.io/acts-project/ubuntu2604:87
+            label: ubuntu26.04
+            compiler: gcc@15.2.0
+            os: ubuntu-latest
+            cxxstd: "23"
             default: false
 
     uses: ./.github/workflows/build_one.yml
