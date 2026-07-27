@@ -95,7 +95,7 @@ def build_table(entries: list[dict], indices: list[int] | None = None) -> Table:
             str(idx),
             e["image"],
             e["compiler"],
-            str(e.get("cxxstd", "20")),
+            str(e.get("cxxstd", "23")),
             "✓" if e.get("default") else "",
         )
     return table
@@ -272,7 +272,7 @@ def _docker_run_base(
         "-e",
         f"COMPILER_PATH={entry.get('compiler_path', '')}",
         "-e",
-        f"CXXSTD={str(entry.get('cxxstd', '20'))}",
+        f"CXXSTD={str(entry.get('cxxstd', '23'))}",
         "-e",
         "GITHUB_ENV=/github_env",
         "-w",
@@ -395,7 +395,7 @@ def execute_build(
         f"\n[bold green]Starting:[/bold green] "
         f"[yellow]{entry['compiler']}[/yellow] · "
         f"[green]{entry['image']}[/green]"
-        f" (C++{entry.get('cxxstd', '20')})\n"
+        f" (C++{entry.get('cxxstd', '23')})\n"
     )
     result = subprocess.run(cmd)
     if result.returncode != 0:
@@ -431,7 +431,7 @@ def entry_searchable(e: dict) -> str:
         [
             e.get("compiler", ""),
             e.get("image", ""),
-            str(e.get("cxxstd", "20")),
+            str(e.get("cxxstd", "23")),
         ]
     ).lower()
 
