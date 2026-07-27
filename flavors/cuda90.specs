@@ -4,7 +4,15 @@
 
 # CUDA toolkit, provided by Spack (no vendor base image needed). The build only
 # needs nvcc/headers; no physical GPU is required to compile.
-cuda@12.6.2
+#
+# The version has a floor set by the image this flavor runs on, and picking it
+# too low fails at concretization ("Cannot find a valid provider for virtual c"
+# for the entire stack, because nothing can provide the host compiler):
+#   * gcc 15 (ubuntu26.04) needs cuda@13:  -- `%gcc@15: conflicts %cuda@:12.9`
+#   * glibc 2.42+ (ubuntu26.04 has 2.43) needs cuda@13.1: -- the C23 exception
+#     specifications of cospi/sinpi/rsqrt changed in glibc 2.41
+# Re-check both when moving this flavor to a different base image or compiler.
+cuda@13.3.0
 
 # traccc GPU tracking R&D stack. Only the packages Spack actually resolves are
 # enabled below; the rest are staged behind for a follow-up once their package
