@@ -87,6 +87,58 @@ def entry_flavor(e: dict) -> str:
     return e.get("flavor", "host")
 
 
+def describe_entry(entry: dict, index: int | None = None) -> str:
+    """One line naming a build unambiguously (Rich markup).
+
+    Every field that can differ between matrix entries is here on purpose: two
+    entries can share an image, a compiler and a cxxstd and differ only in
+    flavor, so a message that omits one of them cannot identify the build it is
+    talking about.
+    """
+    parts = []
+    if index is not None:
+        parts.append(f"[bold cyan]#{index}[/bold cyan]")
+    if entry.get("label"):
+        parts.append(f"[bold green]{entry['label']}[/bold green]")
+    parts.append(f"[yellow]{entry['compiler']}[/yellow]")
+    parts.append(f"C++{entry.get('cxxstd', '23')}")
+    parts.append(f"flavor [red]{entry_flavor(entry)}[/red]")
+    parts.append(f"[dim]{entry['image']}[/dim]")
+    return " · ".join(parts)
+
+
+def short_entry(entry: dict, index: int | None = None) -> str:
+    """Compact form for section rules, which truncate long titles."""
+    name = entry.get("label") or entry["image"].rsplit("/", 1)[-1]
+    prefix = f"#{index} " if index is not None else ""
+    return f"{prefix}{name} · {entry_flavor(entry)}"
+
+
+def announce_plan(action: str, entries: list[dict], indices: list[int]) -> None:
+    """List, in order, what a sequential run is about to do."""
+    console.print(f"\n[bold]{action} plan[/bold] ({len(indices)} in sequence):")
+    for n, i in enumerate(indices):
+        console.print(f"  {n + 1}. {describe_entry(entries[i], i)}")
+
+
+def report_sequence_failure(
+    action: str, entries: list[dict], indices: list[int], failed_at: int
+) -> None:
+    """Say which step of a sequential run failed, and what is left unrun."""
+    i = indices[failed_at]
+    console.print(
+        f"\n[bold red]{action} sequence aborted[/bold red] at step "
+        f"{failed_at + 1} / {len(indices)}: {describe_entry(entries[i], i)}"
+    )
+    if failed_at:
+        done = ", ".join(short_entry(entries[j], j) for j in indices[:failed_at])
+        console.print(f"  [green]succeeded:[/green] {done}")
+    remaining = indices[failed_at + 1 :]
+    if remaining:
+        skipped = ", ".join(short_entry(entries[j], j) for j in remaining)
+        console.print(f"  [yellow]not run:[/yellow] {skipped}")
+
+
 def build_table(entries: list[dict], indices: list[int] | None = None) -> Table:
     """Render entries as a Rich table. `indices` are the global indices to display."""
     if indices is None:
@@ -389,11 +441,15 @@ def execute_push(
     build_dir: Path,
     dry_run: bool,
     run_as_user: bool = True,
+    index: int | None = None,
 ) -> None:
     """Push an already-built environment in `build_dir` to the buildcache mirror."""
     github_env_file = build_dir / "github_env"
     if not dry_run:
         github_env_file.touch(exist_ok=True)
+
+    console.print(f"\n[bold]Pushing:[/bold] {describe_entry(entry, index)}")
+    console.print(f"[bold]From:[/bold] [dim]{build_dir}[/dim]")
 
     push_cmd = build_push_cmd(
         entry, spack_root, build_dir, github_env_file, run_as_user
@@ -414,8 +470,11 @@ def execute_push(
     push_result = subprocess.run(push_cmd)
     if push_result.returncode != 0:
         console.print(
-            f"\n[bold red]Push failed[/bold red] with exit code [bold]{push_result.returncode}[/bold]"
+            f"\n[bold red]Push failed[/bold red] "
+            f"(exit code [bold]{push_result.returncode}[/bold])"
         )
+        console.print(f"  build:     {describe_entry(entry, index)}")
+        console.print(f"  build dir: [dim]{build_dir}[/dim]")
         raise typer.Exit(push_result.returncode)
 
 
@@ -428,6 +487,7 @@ def execute_build(
     push: bool = False,
     jobs: int | None = None,
     run_as_user: bool = True,
+    index: int | None = None,
 ) -> None:
     build_dir.mkdir(parents=True, exist_ok=True)
     github_env_file = build_dir / "github_env"
@@ -440,37 +500,53 @@ def execute_build(
         entry, spack_root, build_dir, github_env_file, shell, jobs, run_as_user
     )
 
+    # Announced before the command and before any work, so an interrupted or
+    # scrolled-off run still says which configuration was being built.
+    console.print(f"\n[bold]Build:[/bold] {describe_entry(entry, index)}")
+    console.print(f"[bold]Build dir:[/bold] [dim]{build_dir}[/dim]")
+
     console.print("\n[bold]Docker command:[/bold]")
     console.print("  " + " \\\n    ".join(cmd), style="dim")
 
     if dry_run:
         if push:
             execute_push(
-                entry, spack_root, build_dir, dry_run=True, run_as_user=run_as_user
+                entry,
+                spack_root,
+                build_dir,
+                dry_run=True,
+                run_as_user=run_as_user,
+                index=index,
             )
         else:
             console.print("\n[yellow]Dry run — not executing.[/yellow]")
         return
 
-    flavor = entry_flavor(entry)
     console.print(
-        f"\n[bold green]Starting:[/bold green] "
-        f"[yellow]{entry['compiler']}[/yellow] · "
-        f"[green]{entry['image']}[/green]"
-        f" (C++{entry.get('cxxstd', '23')})"
-        + (f" · flavor [red]{flavor}[/red]" if flavor != "host" else "")
-        + "\n"
+        f"\n[bold green]Starting:[/bold green] {describe_entry(entry, index)}\n"
     )
     result = subprocess.run(cmd)
     if result.returncode != 0:
         console.print(
-            f"\n[bold red]Build failed[/bold red] with exit code [bold]{result.returncode}[/bold]"
+            f"\n[bold red]Build failed[/bold red] (exit code [bold]{result.returncode}[/bold])"
         )
+        console.print(f"  build:     {describe_entry(entry, index)}")
+        console.print(f"  build dir: [dim]{build_dir}[/dim]")
+        console.print(f"  spack env: [dim]{build_dir / '.spack-env'}[/dim]")
         raise typer.Exit(result.returncode)
+
+    console.print(
+        f"\n[bold green]Build succeeded:[/bold green] {describe_entry(entry, index)}"
+    )
 
     if push:
         execute_push(
-            entry, spack_root, build_dir, dry_run=False, run_as_user=run_as_user
+            entry,
+            spack_root,
+            build_dir,
+            dry_run=False,
+            run_as_user=run_as_user,
+            index=index,
         )
 
 
@@ -666,18 +742,29 @@ def run_build(
         else:
             indices = list(range(len(entries)))
         sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
+        announce_plan("Build", entries, indices)
         for n, i in enumerate(indices):
-            console.rule(f"[bold]Build {n + 1} / {len(indices)} (#{i})[/bold]")
-            execute_build(
-                entries[i],
-                sr,
-                build_dir / f"build_{i}",
-                dry_run,
-                shell,
-                push,
-                jobs,
-                user,
+            console.rule(
+                f"[bold]Build {n + 1} / {len(indices)}:[/bold] {short_entry(entries[i], i)}"
             )
+            try:
+                execute_build(
+                    entries[i],
+                    sr,
+                    build_dir / f"build_{i}",
+                    dry_run,
+                    shell,
+                    push,
+                    jobs,
+                    user,
+                    index=i,
+                )
+            except typer.Exit:
+                report_sequence_failure("Build", entries, indices, n)
+                raise
+        console.print(
+            f"\n[bold green]All {len(indices)} build(s) completed successfully.[/bold green]"
+        )
         return
 
     if selector is None or len(selector) == 0:
@@ -686,7 +773,9 @@ def run_build(
         idx = resolve_entry(entries, selector)
 
     sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
-    execute_build(entries[idx], sr, build_dir, dry_run, shell, push, jobs, user)
+    execute_build(
+        entries[idx], sr, build_dir, dry_run, shell, push, jobs, user, index=idx
+    )
 
 
 def require_built_env(build_dir: Path, dry_run: bool) -> None:
@@ -786,11 +875,21 @@ def push_builds(
         else:
             indices = list(range(len(entries)))
         sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
+        announce_plan("Push", entries, indices)
         for n, i in enumerate(indices):
-            console.rule(f"[bold]Push {n + 1} / {len(indices)} (#{i})[/bold]")
+            console.rule(
+                f"[bold]Push {n + 1} / {len(indices)}:[/bold] {short_entry(entries[i], i)}"
+            )
             bd = build_dir / f"build_{i}"
-            require_built_env(bd, dry_run)
-            execute_push(entries[i], sr, bd, dry_run, user)
+            try:
+                require_built_env(bd, dry_run)
+                execute_push(entries[i], sr, bd, dry_run, user, index=i)
+            except typer.Exit:
+                report_sequence_failure("Push", entries, indices, n)
+                raise
+        console.print(
+            f"\n[bold green]All {len(indices)} push(es) completed successfully.[/bold green]"
+        )
         return
 
     if selector is None or len(selector) == 0:
@@ -800,7 +899,7 @@ def push_builds(
 
     sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
     require_built_env(build_dir, dry_run)
-    execute_push(entries[idx], sr, build_dir, dry_run, user)
+    execute_push(entries[idx], sr, build_dir, dry_run, user, index=idx)
 
 
 @app.callback(invoke_without_command=True)
