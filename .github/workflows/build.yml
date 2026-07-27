@@ -56,7 +56,7 @@ jobs:
 
           - image: ghcr.io/acts-project/ubuntu2404_clang22:88
             label: ubuntu24.04-clang22
-            compiler: llvm@22.1.7
+            compiler: llvm@22.1.8
             os: ubuntu-latest
             default: false
 
