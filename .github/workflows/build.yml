@@ -102,8 +102,17 @@ jobs:
             flavor: cuda90
             default: false
 
-          # ROCm flavor is scaffolded (flavors/rocm-gfx90a.*) but intentionally
-          # left disabled until CUDA is proven out; add a matrix entry to enable.
+          # ROCm/AMD flavor. Unlike cuda (fast binary installer), `hip` builds the
+          # whole ROCm stack from source (llvm-amdgpu + runtime + tools) and lets
+          # vecmem/covfie bind to it; the first build is heavy (disk/time) but the
+          # buildcache absorbs it thereafter. Shake-out run — may hit the runner
+          # disk ceiling, in which case fall back to a rocm base image + externals.
+          - image: ghcr.io/acts-project/ubuntu2404:87
+            label: ubuntu24.04-rocm
+            compiler: gcc@13.3.0
+            os: ubuntu-latest
+            flavor: rocm-gfx90a
+            default: false
 
     uses: ./.github/workflows/build_one.yml
     with:
