@@ -96,10 +96,10 @@ jobs:
           # supports and its PTX JITs onto newer GPUs, so this one build covers
           # downstream testing on anything Turing or later.
           - image: ghcr.io/acts-project/ubuntu2604:89
-            label: ubuntu26.04-cuda75
+            label: ubuntu26.04-cuda13
             compiler: gcc@15.2.0
             os: ubuntu-latest
-            flavor: cuda75
+            flavor: cuda13
             default: false
 
           # ROCm/AMD flavor. Like cuda, this is a binary toolchain: `hip`,

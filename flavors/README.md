@@ -13,8 +13,24 @@ Dockerfile, buildcache entries, and container image tag automatically. The
 special flavor `host` is the plain CPU stack and produces the historical
 three-token triplet with no overlay.
 
-Encode the GPU target in the name (`cuda80`, `cuda90`, `rocm-gfx90a`) so the
-CUDA arch / AMD gfx target is not a separate CI axis.
+Name a flavor after what a consumer cannot work around — the hard compatibility
+boundaries — and leave the rest to the lockfile. Which axes those are differs by
+vendor, which is why `cuda13` and `rocm-gfx90a` are spelled differently:
+
+- **CUDA**: the toolkit major version is hard (a consumer linking
+  `libcudart.so.12` cannot use a `cuda13` stack, and it decides whether prebuilt
+  binaries such as ONNX Runtime's CUDA execution provider load), while the GPU
+  target is soft — `-arch=sm_75` embeds PTX that the driver JIT-compiles onto
+  newer GPUs. So the toolkit is in the name and the arch is not; `cuda_arch` is
+  still visible in the concretized lockfile.
+- **ROCm**: there is no PTX equivalent. HIP embeds a code object per gfx target,
+  so gfx90a code will not run on gfx1100 and the target *is* a hard boundary —
+  hence `rocm-gfx90a`.
+
+Add an arch to a CUDA flavor name only once you ship two of them side by side
+(say an sm_90-tuned build alongside the portable one), and spell it `sm<arch>`
+if you do: `cuda75` and `cuda90` read as CUDA 7.5 and CUDA 9.0, both of which
+were real toolkit versions.
 
 ## File format
 

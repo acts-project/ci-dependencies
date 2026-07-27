@@ -1,6 +1,6 @@
-# Spack config overlay for the `cuda75` flavor (NVIDIA, sm_75 / Turing).
+# Spack config overlay for the `cuda13` flavor (NVIDIA, sm_75 / Turing).
 # Merged into the environment via `spack config add -f`. Config sections only —
-# specs live in flavors/cuda75.specs. Express deltas from the base spack.yaml.
+# specs live in flavors/cuda13.specs. Express deltas from the base spack.yaml.
 #
 # sm_75 is deliberately the *oldest* architecture CUDA 13 still supports (it
 # dropped Maxwell, Pascal and Volta), which makes it the most permissive target
@@ -24,7 +24,7 @@ packages:
   # (cuda_major=12) links CUDA 12 and could not load against the cuda@13.3.0
   # this flavor pins — it would silently degrade to CPU — so select the
   # `gpu_cuda13` tarball instead. cuDNN, which ORT links but does not ship,
-  # comes from cuda75.specs.
+  # comes from cuda13.specs.
   onnxruntime-bin:
     require:
     - "cuda_major=13"

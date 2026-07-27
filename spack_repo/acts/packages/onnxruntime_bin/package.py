@@ -152,7 +152,7 @@ class OnnxruntimeBin(Package):
     # `depends_on`: `+gpu` is the default on linux x86_64, and making the plain
     # CPU stack drag in a CUDA toolkit for a provider it never loads would be a
     # poor trade. A flavor that wants the EP to actually load supplies cuda and
-    # cudnn itself (see flavors/cuda75.*).
+    # cudnn itself (see flavors/cuda13.*).
     variant(
         "cuda_major",
         values=("12", "13"),

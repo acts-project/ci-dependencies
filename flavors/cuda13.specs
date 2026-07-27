@@ -1,6 +1,6 @@
-# Extra specs for the `cuda75` flavor (one per line; `#` comments allowed).
+# Extra specs for the `cuda13` flavor (one per line; `#` comments allowed).
 # Added via `spack add` on top of the base environment. cuda_arch=75 comes from
-# flavors/cuda75.yaml.
+# flavors/cuda13.yaml.
 
 # CUDA toolkit, provided by Spack (no vendor base image needed). The build only
 # needs nvcc/headers; no physical GPU is required to compile.
