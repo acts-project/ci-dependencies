@@ -40,6 +40,11 @@ SPACK_GIT_URL = "https://github.com/spack/spack.git"
 SPACK_PATCHES_DIR = REPO_ROOT / "spack_patches"
 CI_SPACK_DIR = REPO_ROOT / ".local_build" / "spack"
 
+# Writable home for the container when it runs as the host user (see
+# _user_docker_args). The host home isn't mounted, so spack/git get a persisted
+# dir here for ~/.spack, bootstrap store and caches instead of a throwaway root.
+CI_HOME_DIR = REPO_ROOT / ".local_build" / "home"
+
 # Containers launched by this tool are tagged so leftovers from an interrupted
 # run can be cleaned up before the next build — a still-running container holds
 # an flock on the bind-mounted spack root and makes spack hang at
@@ -248,11 +253,40 @@ def cleanup_stale_containers() -> None:
     subprocess.run(["docker", "rm", "-f", *ids], capture_output=True, text=True)
 
 
+def _user_docker_args(run_as_user: bool) -> list[str]:
+    """`docker run` args to run the container as the host user.
+
+    Without this the container runs as root and every file it writes into the
+    bind-mounted spack root and build dir is created root-owned on the host,
+    which later breaks host-side git ops on the cached spack clone and leaves
+    caches you can't clean up without sudo.
+
+    /etc/passwd and /etc/group are mounted read-only so the uid/gid resolve to a
+    name inside the container (spack and git call getpwuid and error on an
+    unknown uid); HOME is redirected to a persisted, writable dir since the host
+    home isn't mounted. Steps that genuinely need root — the apt/dnf installs in
+    opengl.sh and the crypt.h shim in spack_build.sh — fall back to sudo.
+    """
+    if not run_as_user or not hasattr(os, "getuid"):
+        return []
+    CI_HOME_DIR.mkdir(parents=True, exist_ok=True)
+    return [
+        "--user",
+        f"{os.getuid()}:{os.getgid()}",
+        "-v/etc/passwd:/etc/passwd:ro",
+        "-v/etc/group:/etc/group:ro",
+        f"-v{CI_HOME_DIR.resolve()}:/home/build",
+        "-e",
+        "HOME=/home/build",
+    ]
+
+
 def _docker_run_base(
     entry: dict,
     spack_root: str,
     build_dir: Path,
     github_env_file: Path,
+    run_as_user: bool = True,
 ) -> list[str]:
     """Common `docker run` prefix (mounts + env + workdir) shared by build and push."""
     return [
@@ -261,6 +295,7 @@ def _docker_run_base(
         "--rm",
         "--label",
         CONTAINER_LABEL,
+        *_user_docker_args(run_as_user),
         f"-v{REPO_ROOT.resolve()}:/src",
         f"-v{spack_root}:/spack",
         f"-v{build_dir.resolve()}:/build",
@@ -287,8 +322,9 @@ def build_docker_cmd(
     github_env_file: Path,
     shell: bool,
     jobs: int | None = None,
+    run_as_user: bool = True,
 ) -> list[str]:
-    cmd = _docker_run_base(entry, spack_root, build_dir, github_env_file)
+    cmd = _docker_run_base(entry, spack_root, build_dir, github_env_file, run_as_user)
     image = entry["image"]
 
     if jobs is not None:
@@ -314,6 +350,7 @@ def build_push_cmd(
     spack_root: str,
     build_dir: Path,
     github_env_file: Path,
+    run_as_user: bool = True,
 ) -> list[str]:
     """Command to push the just-built env to the buildcache mirror (spack_push.sh).
 
@@ -321,7 +358,7 @@ def build_push_cmd(
     from the host environment by name only (no value), so they never appear in
     the printed command.
     """
-    cmd = _docker_run_base(entry, spack_root, build_dir, github_env_file)
+    cmd = _docker_run_base(entry, spack_root, build_dir, github_env_file, run_as_user)
     cmd += ["-e", f"BASE_IMAGE={entry['image']}"]
     for var in PUSH_CRED_VARS:
         if os.environ.get(var):
@@ -335,13 +372,16 @@ def execute_push(
     spack_root: str,
     build_dir: Path,
     dry_run: bool,
+    run_as_user: bool = True,
 ) -> None:
     """Push an already-built environment in `build_dir` to the buildcache mirror."""
     github_env_file = build_dir / "github_env"
     if not dry_run:
         github_env_file.touch(exist_ok=True)
 
-    push_cmd = build_push_cmd(entry, spack_root, build_dir, github_env_file)
+    push_cmd = build_push_cmd(
+        entry, spack_root, build_dir, github_env_file, run_as_user
+    )
     console.print("\n[bold]Push command:[/bold]")
     console.print("  " + " \\\n    ".join(push_cmd), style="dim")
 
@@ -371,6 +411,7 @@ def execute_build(
     shell: bool,
     push: bool = False,
     jobs: int | None = None,
+    run_as_user: bool = True,
 ) -> None:
     build_dir.mkdir(parents=True, exist_ok=True)
     github_env_file = build_dir / "github_env"
@@ -379,14 +420,18 @@ def execute_build(
     # Pushing only makes sense after a real, non-interactive build.
     push = push and not shell
 
-    cmd = build_docker_cmd(entry, spack_root, build_dir, github_env_file, shell, jobs)
+    cmd = build_docker_cmd(
+        entry, spack_root, build_dir, github_env_file, shell, jobs, run_as_user
+    )
 
     console.print("\n[bold]Docker command:[/bold]")
     console.print("  " + " \\\n    ".join(cmd), style="dim")
 
     if dry_run:
         if push:
-            execute_push(entry, spack_root, build_dir, dry_run=True)
+            execute_push(
+                entry, spack_root, build_dir, dry_run=True, run_as_user=run_as_user
+            )
         else:
             console.print("\n[yellow]Dry run — not executing.[/yellow]")
         return
@@ -405,7 +450,9 @@ def execute_build(
         raise typer.Exit(result.returncode)
 
     if push:
-        execute_push(entry, spack_root, build_dir, dry_run=False)
+        execute_push(
+            entry, spack_root, build_dir, dry_run=False, run_as_user=run_as_user
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -571,6 +618,13 @@ def run_build(
             help="Total build parallelism (spack 'config:build_jobs'); default is spack's own min(16, ncpu).",
         ),
     ] = (os.cpu_count() or 1),
+    user: Annotated[
+        bool,
+        typer.Option(
+            "--user/--no-user",
+            help="Run the container as the host user so bind-mounted files aren't root-owned (default). --no-user runs as root.",
+        ),
+    ] = True,
 ):
     """Run a container build locally in Docker."""
     entries = load_matrix()
@@ -592,7 +646,14 @@ def run_build(
         for n, i in enumerate(indices):
             console.rule(f"[bold]Build {n + 1} / {len(indices)} (#{i})[/bold]")
             execute_build(
-                entries[i], sr, build_dir / f"build_{i}", dry_run, shell, push, jobs
+                entries[i],
+                sr,
+                build_dir / f"build_{i}",
+                dry_run,
+                shell,
+                push,
+                jobs,
+                user,
             )
         return
 
@@ -602,7 +663,7 @@ def run_build(
         idx = resolve_entry(entries, selector)
 
     sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
-    execute_build(entries[idx], sr, build_dir, dry_run, shell, push, jobs)
+    execute_build(entries[idx], sr, build_dir, dry_run, shell, push, jobs, user)
 
 
 def require_built_env(build_dir: Path, dry_run: bool) -> None:
@@ -677,6 +738,13 @@ def push_builds(
             help="Remove leftover local-build containers before starting (default).",
         ),
     ] = True,
+    user: Annotated[
+        bool,
+        typer.Option(
+            "--user/--no-user",
+            help="Run the container as the host user so bind-mounted files aren't root-owned (default). --no-user runs as root.",
+        ),
+    ] = True,
 ) -> None:
     """Push already-built environment(s) to the buildcache mirror, without rebuilding."""
     entries = load_matrix()
@@ -688,7 +756,9 @@ def push_builds(
         if selector:
             indices = resolve_entries(entries, selector)
             if not indices:
-                console.print(f"[red]No builds matching {selector_label(selector)}[/red]")
+                console.print(
+                    f"[red]No builds matching {selector_label(selector)}[/red]"
+                )
                 raise typer.Exit(1)
         else:
             indices = list(range(len(entries)))
@@ -697,7 +767,7 @@ def push_builds(
             console.rule(f"[bold]Push {n + 1} / {len(indices)} (#{i})[/bold]")
             bd = build_dir / f"build_{i}"
             require_built_env(bd, dry_run)
-            execute_push(entries[i], sr, bd, dry_run)
+            execute_push(entries[i], sr, bd, dry_run, user)
         return
 
     if selector is None or len(selector) == 0:
@@ -707,7 +777,7 @@ def push_builds(
 
     sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
     require_built_env(build_dir, dry_run)
-    execute_push(entries[idx], sr, build_dir, dry_run)
+    execute_push(entries[idx], sr, build_dir, dry_run, user)
 
 
 @app.callback(invoke_without_command=True)

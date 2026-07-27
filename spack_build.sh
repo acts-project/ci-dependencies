@@ -51,8 +51,15 @@ if [ -f /etc/os-release ]; then
     . /etc/os-release
     if [ "${ID:-}" = "ubuntu" ] && [ ! -e /usr/include/crypt.h ]; then
         start_section "Install libcrypt-dev (temporary crypt.h shim)"
-        apt-get update
-        apt-get install -y libcrypt-dev
+        # May run as the host user (local_build.py --user); apt needs root, so
+        # fall back to sudo when we're not already root.
+        if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+            SUDO=sudo
+        else
+            SUDO=""
+        fi
+        ${SUDO} apt-get update
+        ${SUDO} apt-get install -y libcrypt-dev
         end_section
     fi
 fi
