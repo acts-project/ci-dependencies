@@ -2,18 +2,23 @@
 # Added via `spack add` on top of the base environment. amdgpu_target=gfx90a
 # comes from flavors/rocm-gfx90a.yaml (applied only to packages that expose it).
 #
-# NOTE: unlike CUDA (spack's `cuda` is a fast binary installer), `hip` builds the
-# whole ROCm stack FROM SOURCE — llvm-amdgpu (AMD's clang fork), hsa-rocr-dev,
-# comgr, hipcc, rocm-core, ... The first build is heavy (hours, disk-hungry);
-# afterwards it is pulled from the OCI buildcache like everything else.
+# Upstream Spack's `hip` builds the whole ROCm stack from source — llvm-amdgpu
+# (AMD's clang fork), comgr, hsa-rocr-dev, the runtime — which costs hours and
+# more disk than a CI runner has. spack_repo/acts/packages/ therefore overrides
+# `hip`, `llvm-amdgpu` and `hsa-rocr-dev` with binary packages that unpack AMD's
+# own rpms (~307 MB download, ~1.2 GB installed, a couple of minutes). Those
+# names are hardcoded in `depends_on` upstream (HIP is not a virtual), which is
+# why they are overrides rather than a separate `rocm-bin` package.
 
-# ROCm HIP toolchain. This single package transitively pulls llvm-amdgpu +
-# runtime + tools; there is no separate `rocm` umbrella package.
+# ROCm HIP toolchain. The prefix is a complete /opt/rocm-style root: hipcc,
+# clang, the device libraries, the runtime and every CMake config package.
 hip
 
 # traccc GPU stack, verified variant names:
 #   vecmem  -> its own `+hip` variant     (depends_on hip when +hip)
 #   covfie  -> spack ROCmPackage `+rocm`  (NOT +hip; maps to COVFIE_PLATFORM_HIP)
+#              ROCmPackage also pulls llvm-amdgpu + hsa-rocr-dev, hence the
+#              binary overrides for those two as well.
 vecmem +hip
 covfie +rocm
 

@@ -102,11 +102,11 @@ jobs:
             flavor: cuda90
             default: false
 
-          # ROCm/AMD flavor. Unlike cuda (fast binary installer), `hip` builds the
-          # whole ROCm stack from source (llvm-amdgpu + runtime + tools) and lets
-          # vecmem/covfie bind to it; the first build is heavy (disk/time) but the
-          # buildcache absorbs it thereafter. Shake-out run — may hit the runner
-          # disk ceiling, in which case fall back to a rocm base image + externals.
+          # ROCm/AMD flavor. Like cuda, this is a binary toolchain: `hip`,
+          # `llvm-amdgpu` and `hsa-rocr-dev` are overridden in spack_repo/acts to
+          # unpack AMD's rpms (~307 MB down, ~1.2 GB installed) instead of
+          # building AMD's clang fork and the ROCm runtime from source, which no
+          # runner has the time or disk for. vecmem/covfie bind to that.
           - image: ghcr.io/acts-project/ubuntu2604:89
             label: ubuntu26.04-rocm
             compiler: gcc@15.2.0
