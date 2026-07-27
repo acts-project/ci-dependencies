@@ -20,6 +20,25 @@ cuda@13.3.0
 # dragging in a second CUDA. Keep the two in step when bumping either.
 cudnn@9.21.0.82-13
 
+# TensorRT, for ACTS' Gnn plugin (it deserializes prebuilt .engine files). Not
+# in upstream Spack; spack_repo/acts/packages/tensorrt unpacks NVIDIA's debs.
+# It lives in this flavor rather than one of its own: a split would duplicate
+# the far larger cuda + cudnn download (~4.9 GB) across two stacks to avoid
+# carrying TensorRT in one.
+#
+# `runtime=full` is the heaviest thing here by far — 1.9 GB downloaded, 2.6 GB
+# installed — and almost all of that is libnvinfer, which exists to *build*
+# engines. ACTS never builds one: it only calls createInferRuntime and
+# deserializeCudaEngine. Switching to `runtime=lean` (15 MB / 106 MB) needs
+# three things to be true on the ACTS side, all of them beyond this repo:
+#   * no initLibNvInferPlugins and no trt::nvinfer_plugin link — the plugin
+#     library has a DT_NEEDED on libnvinfer.so, so it drags the 2.5 GB back in
+#     no matter what else changes,
+#   * FindTensorRT resolving nvinfer_lean rather than nvinfer, and
+#   * .engine files built with version compatibility enabled.
+# Flip the value here once those land; nothing else in this flavor changes.
+tensorrt@11.1.0.106 runtime=full
+
 # traccc GPU tracking R&D stack. Only the packages Spack actually resolves are
 # enabled below; the rest are staged behind for a follow-up once their package
 # names / custom package.py under spack_repo/acts/packages/ are sorted out.
