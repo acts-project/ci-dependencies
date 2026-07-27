@@ -16,7 +16,7 @@ def _gpu_asset(version: str, cuda_major: str) -> str:
     """Name of the linux x86_64 GPU tarball for a release.
 
     Upstream ships one GPU build per CUDA major version, and has renamed the
-    assets twice: `gpu_cuda13` appears from 1.24.4, and from 1.27.0 the CUDA 12
+    assets twice: `gpu_cuda13` appears from 1.24.1, and from 1.27.0 the CUDA 12
     build is `gpu_cuda12` rather than the historical bare `gpu`. Deriving the
     name here means a version bump fails on a checksum rather than on a 404
     from a stale hardcoded asset name.
@@ -61,12 +61,14 @@ def _add_version(
             placement="binaries",
         )
     else:
-        # No CUDA 13 tarball upstream (releases before 1.24.4); asking for one
-        # should fail at concretization, not download something for CUDA 12.
+        # No CUDA 13 tarball upstream (they start at 1.24.1). Asking for one
+        # should fail rather than quietly fetch the CUDA 12 build — though with
+        # cuda_major defaulting to 13, what this normally does is send such a
+        # release back to 12 instead of failing to concretize at all.
         conflicts(
             "cuda_major=13",
             when=f"@{version}",
-            msg=f"onnxruntime {version} has no CUDA 13 build upstream (1.24.4 is the first)",
+            msg=f"onnxruntime {version} has no CUDA 13 build upstream (they start at 1.24.1)",
         )
 
     if sha256_linux_x86_64 is not None:
@@ -153,11 +155,20 @@ class OnnxruntimeBin(Package):
     # CPU stack drag in a CUDA toolkit for a provider it never loads would be a
     # poor trade. A flavor that wants the EP to actually load supplies cuda and
     # cudnn itself (see flavors/cuda13.*).
+    #
+    # 13 is the default so that every flavor resolves to the *same* ORT spec:
+    # only the cuda13 flavor ships a CUDA toolkit, so that is the only stack
+    # where the provider can load at all, and elsewhere the EP is inert either
+    # way and ORT runs on CPU. One default therefore means one tarball, one
+    # buildcache entry, and no ORT diff between the lockfiles.
+    #
+    # Releases with no CUDA 13 build conflict on this value (see _add_version),
+    # so they fall back to 12 rather than failing to concretize.
     variant(
         "cuda_major",
         values=("12", "13"),
         multi=False,
-        default="12",
+        default="13",
         when="+gpu",
         description="CUDA major version the GPU (CUDA EP) build targets",
     )

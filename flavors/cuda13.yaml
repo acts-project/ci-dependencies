@@ -14,17 +14,11 @@ packages:
     # Applied only to packages that actually define a `cuda_arch` variant;
     # packages without it silently ignore this, so it is safe as an `all` entry.
     variants: [cuda_arch=75]
-  # ONNX Runtime GPU (CUDA) execution provider.
-  # NOTE: the variant is `+gpu` (NOT `+cuda`), and it is already default=True on
-  # linux x86_64 — the base spack.yaml therefore ships the GPU binary even on the
-  # CPU host image (it just falls back to CPU when CUDA is absent), so only the
-  # CUDA major version needs pinning here.
-  #
-  # Upstream builds the CUDA EP once per CUDA major version. The default
-  # (cuda_major=12) links CUDA 12 and could not load against the cuda@13.3.0
-  # this flavor pins — it would silently degrade to CPU — so select the
-  # `gpu_cuda13` tarball instead. cuDNN, which ORT links but does not ship,
-  # comes from cuda13.specs.
-  onnxruntime-bin:
-    require:
-    - "cuda_major=13"
+  # ONNX Runtime needs nothing flavor-specific. Upstream builds its CUDA
+  # execution provider once per CUDA major version, and onnxruntime-bin defaults
+  # to `cuda_major=13` for every flavor rather than only here: the EP can only
+  # load where a CUDA toolkit is present, which is this flavor and nowhere else,
+  # so one default keeps all the lockfiles on the same ORT tarball instead of
+  # splitting them over two. What this flavor does add is cuda and cudnn (see
+  # cuda13.specs) — ORT links cuDNN but ships none — which is what turns that
+  # provider from inert into loadable.
