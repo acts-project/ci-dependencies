@@ -26,18 +26,25 @@ cudnn@9.21.0.82-13
 # the far larger cuda + cudnn download (~4.9 GB) across two stacks to avoid
 # carrying TensorRT in one.
 #
-# `runtime=full` is the heaviest thing here by far — 1.9 GB downloaded, 2.6 GB
-# installed — and almost all of that is libnvinfer, which exists to *build*
-# engines. ACTS never builds one: it only calls createInferRuntime and
-# deserializeCudaEngine. Switching to `runtime=lean` (15 MB / 106 MB) needs
-# three things to be true on the ACTS side, all of them beyond this repo:
-#   * no initLibNvInferPlugins and no trt::nvinfer_plugin link — the plugin
-#     library has a DT_NEEDED on libnvinfer.so, so it drags the 2.5 GB back in
-#     no matter what else changes,
-#   * FindTensorRT resolving nvinfer_lean rather than nvinfer, and
-#   * .engine files built with version compatibility enabled.
-# Flip the value here once those land; nothing else in this flavor changes.
-tensorrt@11.1.0.106 runtime=full
+# Most of TensorRT is builder weight that ACTS never uses — it only calls
+# createInferRuntime and deserializeCudaEngine. `builder=` keeps just the
+# per-architecture builder resource for this flavor's own target, taking the
+# install from 2628 MB to 922 MB while leaving every library and symbol ACTS
+# links exactly as shipped. Keep it in step with cuda_arch in cuda13.yaml:
+# sm75 here is the same Turing target. `builder=none` would save a further
+# 111 MB but then no engine can be built at all, which is a bet on nothing in
+# the stack ever calling the builder — hence the conservative choice.
+#
+# The download is ~1.9 GB either way: NVIDIA ships every builder resource
+# inside the one libnvinfer11 deb, so trimming only shrinks the installed tree,
+# the buildcache entry and the image — the costs that recur.
+#
+# `runtime=lean` would be 106 MB, but it is not reachable from where ACTS is:
+# it has no plugin library, and ACTS calls initLibNvInferPlugins and links
+# trt::nvinfer_plugin, whose DT_NEEDED on libnvinfer pulls the full library
+# back regardless. It would also need FindTensorRT to resolve nvinfer_lean and
+# engines built version compatible. Flip it here if those ever land upstream.
+tensorrt@11.1.0.106 runtime=full builder=sm75
 
 # traccc GPU tracking R&D stack. Only the packages Spack actually resolves are
 # enabled below; the rest are staged behind for a follow-up once their package

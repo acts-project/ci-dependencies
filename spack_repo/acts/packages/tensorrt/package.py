@@ -14,11 +14,12 @@ from spack.package import *
 # repository: {version: {runtime: [(deb file name, sha256), ...]}}. The debs and
 # their checksums come straight from that repository's signed Packages index.
 #
-# Two sets, because the size difference is a factor of 25:
+# Two sets:
 #
-#   full  libnvinfer + plugins + ONNX parser. 1879 MB downloaded, 2628 MB
-#         installed, essentially all of it libnvinfer itself, which carries the
-#         builder and its kernels.
+#   full  libnvinfer + plugins + ONNX parser. 1879 MB downloaded; installed
+#         between 811 and 2628 MB depending on `builder` below, because only
+#         639 MB of it is libnvinfer — the rest is per-architecture builder
+#         resources shipped inside the same deb.
 #   lean  the runtime-only library. 15 MB downloaded, 106 MB installed. It can
 #         deserialize and execute engines but not build them, and only engines
 #         that were built version compatible.
@@ -88,6 +89,20 @@ _debs = {
 }
 _REPO = "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64"
 
+# The per-architecture builder resources shipped inside the libnvinfer11 deb,
+# with their installed sizes in MB. libnvinfer dlopens at most one of these, and
+# only while building an engine.
+_BUILDER_ARCHS = {
+    "sm75": 111,
+    "sm80": 178,
+    "sm86": 168,
+    "sm89": 176,
+    "sm90": 433,
+    "sm100": 271,
+    "sm120": 251,
+    "ptx": 229,
+}
+
 
 class Tensorrt(Package):
     """NVIDIA TensorRT, a high performance deep learning inference library.
@@ -97,13 +112,22 @@ class Tensorrt(Package):
     which is public, versioned and checksummed — into a plain prefix that a
     `find_path(NvInfer.h)` / `find_library(nvinfer...)` module resolves.
 
-    `runtime=lean` cuts this from 2.6 GB to 106 MB and is enough to deserialize
-    and run prebuilt engines, which is all ACTS does with TensorRT. It is not a
-    drop-in for `full`, though: it drops the plugin library (whose DT_NEEDED on
-    libnvinfer would pull the 2.5 GB straight back in), so a consumer must not
-    call initLibNvInferPlugins or link trt::nvinfer_plugin, must link
-    nvinfer_lean instead of nvinfer, and must feed it engines that were built
-    version compatible.
+    Two independent size knobs, because most of TensorRT is builder weight that
+    an inference-only consumer never touches:
+
+    `builder` selects which per-architecture builder resources to keep. They are
+    the bulk of the install — 1817 MB across eight files against a 639 MB
+    libnvinfer.so — and nothing loads them unless an engine is *built*: they are
+    not DT_NEEDED anywhere, libnvinfer dlopens one by a name it assembles at
+    run time from the target architecture. Dropping the ones you cannot build
+    for costs nothing at inference and changes no symbol a consumer links.
+
+    `runtime=lean` is the more aggressive knob (106 MB) but not a drop-in: it
+    has no plugin library, whose DT_NEEDED on libnvinfer would pull the full
+    library back in anyway, so a consumer must not call initLibNvInferPlugins
+    or link trt::nvinfer_plugin, must link nvinfer_lean instead of nvinfer, and
+    must feed it engines built version compatible. ACTS does none of those
+    today, which is why `full` with a trimmed `builder` is the default.
     """
 
     homepage = "https://developer.nvidia.com/tensorrt"
@@ -123,8 +147,26 @@ class Tensorrt(Package):
         values=("full", "lean"),
         multi=False,
         default="full",
-        description="full: builder + plugins + ONNX parser (2.6 GB); "
+        description="full: builder + plugins + ONNX parser; "
         "lean: run prebuilt version-compatible engines only (106 MB)",
+    )
+
+    # Sizes below are the installed footprint of runtime=full. The *download* is
+    # ~1879 MB whatever this is set to: NVIDIA ships every builder resource
+    # inside the one libnvinfer11 deb, so trimming can only happen after
+    # unpacking. What it does shrink is the installed tree, and with it the
+    # buildcache tarball and the container image, which are the recurring costs.
+    #
+    #   all   2628 MB   every architecture NVIDIA ships
+    #   sm75   922 MB   engines can still be built for this flavor's own target
+    #   none   811 MB   inference only; building any engine fails
+    variant(
+        "builder",
+        values=("none", "all") + tuple(_BUILDER_ARCHS),
+        multi=True,
+        default="sm75",
+        description="per-architecture builder resources to keep; engines can "
+        "only be *built* for architectures kept here (inference is unaffected)",
     )
 
     # The debs are built against a specific CUDA major version (+cuda13.3 here),
@@ -156,6 +198,53 @@ class Tensorrt(Package):
                     placement="{0}-{1}".format(_runtime, _deb.split("_")[0]),
                     when="@{0} runtime={1}".format(_version, _runtime),
                 )
+
+    def _prune_builder_resources(self, spec, prefix):
+        """Delete the builder resources for architectures we did not ask for.
+
+        Only reachable through the builder: libnvinfer has no DT_NEEDED on any
+        of them and dlopens one by an assembled name when compiling an engine
+        for that architecture. Removing one therefore costs nothing until
+        something tries to build for it, at which point TensorRT reports the
+        missing resource rather than misbehaving.
+        """
+        keep = set(spec.variants["builder"].value)
+        if "all" in keep:
+            return
+        keep.discard("none")
+
+        unknown = keep - set(_BUILDER_ARCHS)
+        if unknown:
+            raise InstallError("unknown builder architectures: {0}".format(sorted(unknown)))
+
+        removed_mb = 0
+        found = set()
+        for entry in sorted(os.listdir(prefix.lib)):
+            if not entry.startswith("libnvinfer_builder_resource"):
+                continue
+            # libnvinfer_builder_resource_sm90.so.11.1.0 -> sm90; the
+            # architecture-less name (if NVIDIA ever ships one) is never pruned.
+            arch = entry.split(".so")[0].replace("libnvinfer_builder_resource", "").lstrip("_")
+            if not arch:
+                continue
+            found.add(arch)
+            if arch in keep:
+                continue
+            path = os.path.join(prefix.lib, entry)
+            removed_mb += os.path.getsize(path) // (1024 * 1024)
+            os.remove(path)
+            tty.info("pruned builder resource for {0}".format(arch))
+
+        missing = keep - found
+        if missing:
+            raise InstallError(
+                "asked to keep builder resources {0}, but this release ships only {1}".format(
+                    sorted(missing), sorted(found)
+                )
+            )
+        tty.info(
+            "builder resources: kept {0}, freed {1} MB".format(sorted(keep) or "none", removed_mb)
+        )
 
     def install(self, spec, prefix):
         # Unpack inside the prefix so promoting the tree is a rename rather than
@@ -192,6 +281,8 @@ class Tensorrt(Package):
             for entry in os.listdir(src):
                 shutil.move(os.path.join(src, entry), os.path.join(dst, entry))
         shutil.rmtree(staging)
+
+        self._prune_builder_resources(spec, prefix)
 
         # The unversioned .so of each component a consumer links, plus the
         # headers. Fail here rather than in a downstream cmake configure if
