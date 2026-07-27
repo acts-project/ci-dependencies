@@ -82,6 +82,11 @@ def load_matrix() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+def entry_flavor(e: dict) -> str:
+    """Accelerator flavor of a matrix entry, defaulted like build.yml does."""
+    return e.get("flavor", "host")
+
+
 def build_table(entries: list[dict], indices: list[int] | None = None) -> Table:
     """Render entries as a Rich table. `indices` are the global indices to display."""
     if indices is None:
@@ -89,18 +94,24 @@ def build_table(entries: list[dict], indices: list[int] | None = None) -> Table:
 
     table = Table(title="Container Build Matrix", show_lines=True, highlight=True)
     table.add_column("#", style="bold cyan", justify="right", no_wrap=True)
+    table.add_column("Label", style="bold green")
     table.add_column("Image", style="green")
     table.add_column("Compiler", style="yellow")
     table.add_column("C++ Std", style="magenta", justify="center")
+    # Several entries share an image and differ only by flavor, so it has to be
+    # visible to tell them apart here and in the selector.
+    table.add_column("Flavor", style="red", justify="center")
     table.add_column("Default", style="blue", justify="center")
 
     for idx in indices:
         e = entries[idx]
         table.add_row(
             str(idx),
+            e.get("label", ""),
             e["image"],
             e["compiler"],
             str(e.get("cxxstd", "23")),
+            entry_flavor(e),
             "✓" if e.get("default") else "",
         )
     return table
@@ -308,6 +319,11 @@ def _docker_run_base(
         f"COMPILER_PATH={entry.get('compiler_path', '')}",
         "-e",
         f"CXXSTD={str(entry.get('cxxstd', '23'))}",
+        # Without this every entry would build the plain CPU stack, silently:
+        # spack_build.sh defaults FLAVOR to `host`, and the flavor is the only
+        # thing that distinguishes e.g. ubuntu26.04-rocm from ubuntu26.04.
+        "-e",
+        f"FLAVOR={entry_flavor(entry)}",
         "-e",
         "GITHUB_ENV=/github_env",
         "-w",
@@ -436,11 +452,14 @@ def execute_build(
             console.print("\n[yellow]Dry run — not executing.[/yellow]")
         return
 
+    flavor = entry_flavor(entry)
     console.print(
         f"\n[bold green]Starting:[/bold green] "
         f"[yellow]{entry['compiler']}[/yellow] · "
         f"[green]{entry['image']}[/green]"
-        f" (C++{entry.get('cxxstd', '23')})\n"
+        f" (C++{entry.get('cxxstd', '23')})"
+        + (f" · flavor [red]{flavor}[/red]" if flavor != "host" else "")
+        + "\n"
     )
     result = subprocess.run(cmd)
     if result.returncode != 0:
@@ -479,6 +498,10 @@ def entry_searchable(e: dict) -> str:
             e.get("compiler", ""),
             e.get("image", ""),
             str(e.get("cxxstd", "23")),
+            # label and flavor are the only handles on the GPU entries: they
+            # share image, compiler and cxxstd with the plain CPU build.
+            e.get("label", ""),
+            entry_flavor(e),
         ]
     ).lower()
 
