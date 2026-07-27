@@ -92,14 +92,14 @@ jobs:
           # GPU flavors: overlay the traccc stack from flavors/<flavor>.{yaml,specs}
           # onto the base env. Spack provides the toolkit, so the standard base
           # images are reused. Keep `default: false` so they never overwrite the
-          # per-arch canonical lockfile. This is the first CI run of the cuda90
-          # flavor — the specs are unvalidated, so this entry is expected to be
-          # shaken out (missing packages may need a package.py under spack_repo).
+          # per-arch canonical lockfile. sm_75 is the oldest arch CUDA 13 still
+          # supports and its PTX JITs onto newer GPUs, so this one build covers
+          # downstream testing on anything Turing or later.
           - image: ghcr.io/acts-project/ubuntu2604:89
-            label: ubuntu26.04-cuda90
+            label: ubuntu26.04-cuda75
             compiler: gcc@15.2.0
             os: ubuntu-latest
-            flavor: cuda90
+            flavor: cuda75
             default: false
 
           # ROCm/AMD flavor. Like cuda, this is a binary toolchain: `hip`,

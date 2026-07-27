@@ -1,0 +1,30 @@
+# Spack config overlay for the `cuda75` flavor (NVIDIA, sm_75 / Turing).
+# Merged into the environment via `spack config add -f`. Config sections only —
+# specs live in flavors/cuda75.specs. Express deltas from the base spack.yaml.
+#
+# sm_75 is deliberately the *oldest* architecture CUDA 13 still supports (it
+# dropped Maxwell, Pascal and Volta), which makes it the most permissive target
+# available here: nvcc's `-arch=sm_75` embeds PTX for compute_75 alongside the
+# Turing cubin, and the driver JIT-compiles that PTX onto anything newer. Device
+# code built in this flavor therefore runs on Turing natively and on Ampere/Ada/
+# Hopper/Blackwell through JIT, at the cost of a first-load JIT and no
+# arch-specific tuning. Downstream (ACTS, traccc) still picks its own arch.
+packages:
+  all:
+    # Applied only to packages that actually define a `cuda_arch` variant;
+    # packages without it silently ignore this, so it is safe as an `all` entry.
+    variants: [cuda_arch=75]
+  # ONNX Runtime GPU (CUDA) execution provider.
+  # NOTE: the variant is `+gpu` (NOT `+cuda`), and it is already default=True on
+  # linux x86_64 — the base spack.yaml therefore ships the GPU binary even on the
+  # CPU host image (it just falls back to CPU when CUDA is absent), so only the
+  # CUDA major version needs pinning here.
+  #
+  # Upstream builds the CUDA EP once per CUDA major version. The default
+  # (cuda_major=12) links CUDA 12 and could not load against the cuda@13.3.0
+  # this flavor pins — it would silently degrade to CPU — so select the
+  # `gpu_cuda13` tarball instead. cuDNN, which ORT links but does not ship,
+  # comes from cuda75.specs.
+  onnxruntime-bin:
+    require:
+    - "cuda_major=13"

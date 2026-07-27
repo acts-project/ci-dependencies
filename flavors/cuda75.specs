@@ -1,6 +1,6 @@
-# Extra specs for the `cuda90` flavor (one per line; `#` comments allowed).
-# Added via `spack add` on top of the base environment. cuda_arch=90 comes from
-# flavors/cuda90.yaml.
+# Extra specs for the `cuda75` flavor (one per line; `#` comments allowed).
+# Added via `spack add` on top of the base environment. cuda_arch=75 comes from
+# flavors/cuda75.yaml.
 
 # CUDA toolkit, provided by Spack (no vendor base image needed). The build only
 # needs nvcc/headers; no physical GPU is required to compile.
@@ -13,6 +13,12 @@
 #     specifications of cospi/sinpi/rsqrt changed in glibc 2.41
 # Re-check both when moving this flavor to a different base image or compiler.
 cuda@13.3.0
+
+# cuDNN, needed by ONNX Runtime's CUDA execution provider, which links it but
+# does not bundle it. The `-13` suffix is the CUDA 13 build: the package maps it
+# to `depends_on("cuda@13")`, so it unifies with the toolkit above rather than
+# dragging in a second CUDA. Keep the two in step when bumping either.
+cudnn@9.21.0.82-13
 
 # traccc GPU tracking R&D stack. Only the packages Spack actually resolves are
 # enabled below; the rest are staged behind for a follow-up once their package
