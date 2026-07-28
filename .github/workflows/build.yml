@@ -47,33 +47,33 @@ jobs:
       matrix:
 
         include:
-          - image: ghcr.io/acts-project/alma9-base:88
+          - image: ghcr.io/acts-project/alma9-base:89
             label: alma9
             compiler: gcc@15.2.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404_clang22:88
-            label: ubuntu24.04-clang22
+          - image: ghcr.io/acts-project/ubuntu2604_clang22:89
+            label: ubuntu26.04-clang22
             compiler: llvm@22.1.8
             os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/alma10-base:88
+          - image: ghcr.io/acts-project/alma10-base:89
             label: alma10
             compiler: gcc@15.2.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2604:88
+          - image: ghcr.io/acts-project/ubuntu2604:89
             label: ubuntu26.04
             compiler: gcc@15.2.0
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2604:88
+          - image: ghcr.io/acts-project/ubuntu2604:89
             label: ubuntu26.04-arm
             compiler: gcc@15.2.0
             os: ubuntu-24.04-arm
