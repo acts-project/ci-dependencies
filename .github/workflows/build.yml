@@ -38,7 +38,7 @@ jobs:
       default: ${{ matrix.default }}
 
   build_container:
-    name: ${{ matrix.label }} · ${{ matrix.compiler }}
+    name: ${{ matrix.label }} · ${{ matrix.compiler }}${{ matrix.cxxstd == '20' && ' (C++20)' || '' }}
     permissions:
       contents: write
       packages: write
@@ -79,13 +79,23 @@ jobs:
             os: ubuntu-24.04-arm
             default: false
 
+          # Keep one C++20 configuration alive so we notice if the stack stops
+          # building against the older standard. Must stay `default: false` so
+          # it does not overwrite the canonical arch lockfile.
+          - image: ghcr.io/acts-project/ubuntu2604:89
+            label: ubuntu26.04
+            compiler: gcc@15.2.0
+            os: ubuntu-latest
+            cxxstd: "20"
+            default: false
+
     uses: ./.github/workflows/build_one.yml
     with:
       os: ${{ matrix.os }}
       image: ${{ matrix.image }}
       compiler: ${{ matrix.compiler }}
       compiler_path: ${{ matrix.compiler_path || '' }}
-      cxxstd: "23"
+      cxxstd: ${{ matrix.cxxstd || '23' }}
       default: ${{ matrix.default }}
 
   lockfile_diff:
