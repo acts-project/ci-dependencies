@@ -34,10 +34,11 @@ jobs:
       os: ${{ matrix.os }}
       xcode: ${{ matrix.xcode }}
       compiler: ${{ matrix.compiler }}
+      cxxstd: "23"
       default: ${{ matrix.default }}
 
   build_container:
-    name: ${{ matrix.label }} · ${{ matrix.compiler }}${{ matrix.cxxstd == '23' && ' (C++23)' || '' }}
+    name: ${{ matrix.label }} · ${{ matrix.compiler }}
     permissions:
       contents: write
       packages: write
@@ -46,57 +47,36 @@ jobs:
       matrix:
 
         include:
-          - image: ghcr.io/acts-project/alma9-base:87
+          - image: ghcr.io/acts-project/alma9-base:89
             label: alma9
             compiler: gcc@15.2.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             default: true
 
-          - image: ghcr.io/acts-project/ubuntu2404:87
-            label: ubuntu24.04
-            compiler: gcc@13.3.0
-            os: ubuntu-latest
-            default: true
-
-          - image: ghcr.io/acts-project/ubuntu2404_clang22:87
-            label: ubuntu24.04-clang22
-            compiler: llvm@22.1.7
+          - image: ghcr.io/acts-project/ubuntu2604_clang22:89
+            label: ubuntu26.04-clang22
+            compiler: llvm@22.1.8
             os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2404:87
-            label: ubuntu24.04-arm
-            compiler: gcc@13.3.0
-            os: ubuntu-24.04-arm
-            default: false
-
-          - image: ghcr.io/acts-project/alma9-base:87
-            label: alma9
-            compiler: gcc@15.2.1
-            compiler_path: "/opt/rh/gcc-toolset-15/root"
-            os: ubuntu-latest
-            cxxstd: "23"
-            default: false
-
-          - image: ghcr.io/acts-project/ubuntu2404_clang22:87
-            label: ubuntu24.04-clang22
-            compiler: llvm@22.1.7
-            os: ubuntu-latest
-            cxxstd: "23"
-            default: false
-
-          - image: ghcr.io/acts-project/alma10-base:87
+          - image: ghcr.io/acts-project/alma10-base:89
             label: alma10
             compiler: gcc@15.2.1
             compiler_path: "/opt/rh/gcc-toolset-15/root"
             os: ubuntu-latest
             default: false
 
-          - image: ghcr.io/acts-project/ubuntu2604:87
+          - image: ghcr.io/acts-project/ubuntu2604:89
             label: ubuntu26.04
             compiler: gcc@15.2.0
             os: ubuntu-latest
+            default: true
+
+          - image: ghcr.io/acts-project/ubuntu2604:89
+            label: ubuntu26.04-arm
+            compiler: gcc@15.2.0
+            os: ubuntu-24.04-arm
             default: false
 
     uses: ./.github/workflows/build_one.yml
@@ -105,7 +85,7 @@ jobs:
       image: ${{ matrix.image }}
       compiler: ${{ matrix.compiler }}
       compiler_path: ${{ matrix.compiler_path || '' }}
-      cxxstd: ${{ matrix.cxxstd || '20' }}
+      cxxstd: "23"
       default: ${{ matrix.default }}
 
   lockfile_diff:
@@ -117,10 +97,10 @@ jobs:
       contents: read   # gh release view/download
       actions: read    # download-artifact from this run
     env:
-      # Canonical lockfile to compare: the default ubuntu24.04 x86_64 build,
+      # Canonical lockfile to compare: the default ubuntu26.04 x86_64 build,
       # which matches the published spack-container image. The name is
       # compiler-version independent, so it diffs cleanly across releases.
-      CANONICAL_LOCK: spack_linux-ubuntu24.04-x86_64.lock
+      CANONICAL_LOCK: spack_linux-ubuntu26.04-x86_64.lock
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -175,10 +155,10 @@ jobs:
       contents: write  # gh release edit (write release body)
       actions: read    # download-artifact from this run
     env:
-      # Same canonical lockfile as the PR diff: the default ubuntu24.04 x86_64
+      # Same canonical lockfile as the PR diff: the default ubuntu26.04 x86_64
       # build, whose name is compiler-version independent so it diffs cleanly
       # across releases.
-      CANONICAL_LOCK: spack_linux-ubuntu24.04-x86_64.lock
+      CANONICAL_LOCK: spack_linux-ubuntu26.04-x86_64.lock
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -323,4 +303,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REF_NAME: ${{ github.ref_name }}
         run: |
-          uv run merge_images.py "$REF_NAME" ".*ubuntu24.04.*gcc.*" --push
+          uv run merge_images.py "$REF_NAME" ".*ubuntu26.04.*gcc.*cxx23" --push
