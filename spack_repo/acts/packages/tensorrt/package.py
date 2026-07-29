@@ -87,6 +87,23 @@ _debs = {
         ],
     }
 }
+
+# The distro in this URL is immaterial, despite the flavor's base image being
+# 26.04: these debs declare no Depends at all and we unpack them by hand rather
+# than through apt (see unresolved_libraries below), so the 24.04 build runs on
+# 26.04 unchanged. A ubuntu2604 pool does exist and carries this same
+# 11.1.0.106+cuda13.3 set, under different checksums; moving there is possible
+# but buys nothing.
+#
+# On the risk of a pinned deb vanishing upstream: NVIDIA keeps these pools deep
+# — the oldest TensorRT still served here was published 2024-09 — and all ten
+# pins above were verified live. Exposure is narrow anyway, because a spec
+# already in the buildcache never refetches; only a cache miss (a cuda, compiler
+# or variant change) goes back to NVIDIA. A deletion would fail the fetch loudly
+# rather than install something wrong, and the fix is to re-pin to a published
+# version. If that ever stops being an acceptable trade, the real remedy is a
+# source mirror — the buildcache in spack.yaml is binary-only and does not
+# archive these debs.
 _REPO = "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64"
 
 # The per-architecture builder resources shipped inside the libnvinfer11 deb,
