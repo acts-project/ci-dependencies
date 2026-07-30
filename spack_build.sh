@@ -110,13 +110,22 @@ else
     spack -e . config add -f "$flavor_cfg"
   fi
   # Add the extra specs, one per line; `#` comments and blank lines are ignored.
+  # A line naming a package that is already a root spec in the base spack.yaml
+  # is merged onto it via `spack change` (which overrides only the attributes
+  # that actually conflict, e.g. flipping a variant, and leaves the rest of the
+  # matched spec — version, other variants — untouched); a line naming a
+  # package with no existing root spec falls back to `spack add` as a new one.
   if [ -f "$flavor_specs" ]; then
     while IFS= read -r line; do
       line="${line%%#*}"
       line="$(echo "$line" | xargs)"
       [ -n "$line" ] || continue
-      echo "Adding spec: $line"
-      spack -e . add "$line"
+      if spack -e . change "$line" 2>/dev/null; then
+        echo "Merged spec onto existing root spec: $line"
+      else
+        echo "Adding spec: $line"
+        spack -e . add "$line"
+      fi
     done < "$flavor_specs"
   fi
 fi

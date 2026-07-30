@@ -41,7 +41,12 @@ For a flavor `<name>`, `spack_build.sh` looks for two optional files:
   `concretizer:`, `config:`), **not** wrapped in a top-level `spack:` key and
   **not** containing `specs:`.
 - `flavors/<name>.specs` — extra specs, one per line. `#` comments and blank
-  lines are ignored. Each non-empty line is passed to `spack add`.
+  lines are ignored. Each non-empty line is passed to `spack change` first,
+  which merges it onto the existing root spec of the same package name if the
+  base `spack.yaml` already has one — overriding only the attributes that
+  actually conflict (e.g. flipping a variant) and leaving the rest (version,
+  other variants) as the base declared them. If no root spec with that name
+  exists yet, it falls back to `spack add`, adding it as a new one.
 
 At least one of the two must exist, or the build fails with "unknown flavor".
 
