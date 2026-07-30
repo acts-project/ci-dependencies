@@ -3,15 +3,11 @@
 # specs live in flavors/rocm-gfx90a.specs. Express deltas from the base spack.yaml.
 packages:
   all:
-    # Applied only to packages that define an `amdgpu_target` variant; others
-    # ignore it, so it is safe as an `all` entry.
+    # Safe as an `all` entry: packages without an amdgpu_target variant ignore it.
     variants: [amdgpu_target=gfx90a]
-  # `hip`, `llvm-amdgpu`, `hsa-rocr-dev` and `comgr` resolve to the binary
-  # packages in spack_repo/acts/packages/ (they shadow the from-source builtin
-  # ones), which carry only the ROCm releases whose rpm names and hashes are
-  # recorded there.
-  # Pinning keeps the ROCm version an explicit choice of this flavor rather than
-  # whatever the concretizer picks once more versions are added.
+  # hip/llvm-amdgpu/hsa-rocr-dev/comgr resolve to the binary packages in
+  # spack_repo/acts/packages/, which only carry the ROCm releases recorded
+  # there. Pin explicitly so the concretizer can't pick a different one.
   hip:
     require:
     - "@6.4.3"

@@ -79,9 +79,8 @@ jobs:
             os: ubuntu-24.04-arm
             default: false
 
-          # Keep one C++20 configuration alive so we notice if the stack stops
-          # building against the older standard. Must stay `default: false` so
-          # it does not overwrite the canonical arch lockfile.
+          # Keeps C++20 alive alongside the default C++23 build. default: false
+          # so it never overwrites the canonical arch lockfile.
           - image: ghcr.io/acts-project/ubuntu2604:89
             label: ubuntu26.04
             compiler: gcc@15.2.0
@@ -89,12 +88,9 @@ jobs:
             cxxstd: "20"
             default: false
 
-          # GPU flavors: overlay the traccc stack from flavors/<flavor>.{yaml,specs}
-          # onto the base env. Spack provides the toolkit, so the standard base
-          # images are reused. Keep `default: false` so they never overwrite the
-          # per-arch canonical lockfile. sm_75 is the oldest arch CUDA 13 still
-          # supports and its PTX JITs onto newer GPUs, so this one build covers
-          # downstream testing on anything Turing or later.
+          # GPU flavors overlay flavors/<flavor>.{yaml,specs} onto the base env;
+          # Spack supplies the toolkit, so the standard base images are reused.
+          # default: false so they never overwrite the canonical lockfile.
           - image: ghcr.io/acts-project/ubuntu2604:89
             label: ubuntu26.04-cuda13
             compiler: gcc@15.2.0
@@ -102,11 +98,6 @@ jobs:
             flavor: cuda13
             default: false
 
-          # ROCm/AMD flavor. Like cuda, this is a binary toolchain: `hip`,
-          # `llvm-amdgpu` and `hsa-rocr-dev` are overridden in spack_repo/acts to
-          # unpack AMD's rpms (~307 MB down, ~1.2 GB installed) instead of
-          # building AMD's clang fork and the ROCm runtime from source, which no
-          # runner has the time or disk for. vecmem/covfie bind to that.
           - image: ghcr.io/acts-project/ubuntu2604:89
             label: ubuntu26.04-rocm
             compiler: gcc@15.2.0

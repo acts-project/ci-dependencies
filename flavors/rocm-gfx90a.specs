@@ -2,58 +2,40 @@
 # Added via `spack add` on top of the base environment. amdgpu_target=gfx90a
 # comes from flavors/rocm-gfx90a.yaml (applied only to packages that expose it).
 #
-# Upstream Spack's `hip` builds the whole ROCm stack from source — llvm-amdgpu
-# (AMD's clang fork), comgr, hsa-rocr-dev, the runtime — which costs hours and
-# more disk than a CI runner has. spack_repo/acts/packages/ therefore overrides
+# Upstream Spack's `hip` builds the whole ROCm stack from source, which costs
+# hours and more disk than a CI runner has. spack_repo/acts/packages/ overrides
 # `hip`, `llvm-amdgpu`, `hsa-rocr-dev` and `comgr` with binary packages that
-# unpack AMD's own rpms (~307 MB download, ~1.2 GB installed, a couple of
-# minutes). Those names are hardcoded in `depends_on` upstream (HIP is not a
-# virtual), which is why they are overrides rather than a separate `rocm-bin`
-# package.
+# unpack AMD's rpms instead (~307 MB download, ~1.2 GB installed). Those names
+# are hardcoded in depends_on upstream (HIP is not a virtual), hence overrides
+# rather than a separate package.
 
-# ROCm HIP toolchain. The prefix is a complete /opt/rocm-style root: hipcc,
-# clang, the device libraries, the runtime and every CMake config package.
+# ROCm HIP toolchain: a complete /opt/rocm-style root (hipcc, clang, device
+# libs, runtime, CMake config packages).
 hip
 
-# traccc GPU stack, verified variant names:
-#   vecmem  -> its own `+hip` variant     (depends_on hip when +hip)
-#   covfie  -> spack ROCmPackage `+rocm`  (NOT +hip; maps to COVFIE_PLATFORM_HIP)
-#              ROCmPackage also pulls llvm-amdgpu + hsa-rocr-dev, hence the
-#              binary overrides for those two as well.
+# traccc GPU stack. vecmem uses its own `+hip` variant; covfie is a
+# ROCmPackage so it's `+rocm` (maps to COVFIE_PLATFORM_HIP) and also pulls in
+# llvm-amdgpu + hsa-rocr-dev.
 vecmem@1.25.0 +hip
 covfie@0.15.6 +rocm
 
-# rocThrust, the HIP-side Thrust traccc resolves with find_package(rocthrust)
-# when TRACCC_BUILD_HIP is on. Spack ties it to a matching ROCm release —
-# rocthrust@X depends_on hip@X exactly — so this has to track the hip@6.4.3
-# pin in rocm-gfx90a.yaml rather than float.
-#
-# Its dependency closure is what forced the `comgr` override: rocthrust pulls
-# rocprim, and rocprim is the only thing in this stack that depends on comgr.
-# The builtin comgr builds from the full ROCm llvm-project tarball *and* wants
-# clang's CMake package under <llvm-amdgpu>/lib/cmake/clang, which AMD's
-# rocm-llvm rpm does not ship — so from source it does not merely cost hours
-# here, it cannot succeed. AMD's comgr rpm is already unpacked by `hip`, so
-# spack_repo/acts/packages/comgr points at it the way the other three do.
-#
-# The rest of the closure is genuinely cheap: rocm-cmake (CMake modules) and
-# its rocm-core (a version-reporting shim) are build-type deps, so they neither
-# cost much nor reach the environment view.
+# rocThrust — the HIP-side Thrust traccc resolves via find_package(rocthrust)
+# when TRACCC_BUILD_HIP is on. Pinned to match hip@6.4.3 from rocm-gfx90a.yaml,
+# since rocthrust@X depends_on hip@X exactly. Its closure is what forced the
+# comgr override: rocthrust -> rocprim -> comgr, and the builtin comgr can't
+# build from AMD's rpm layout (wants clang's CMake package where the rpm
+# doesn't ship it); AMD's comgr rpm is already unpacked by `hip`.
 rocthrust@6.4.3
 
-# Alpaka, for traccc's portability backend. `backend=hip` rather than
-# `hip_only`, which conflicts with every other backend and would drop the
-# serial one. amdgpu_target=gfx90a comes from rocm-gfx90a.yaml.
+# Alpaka, traccc's portability backend. `backend=hip` not `hip_only`, which
+# would drop the serial backend too.
 alpaka backend=hip
 
-# Deliberately absent, as in the cuda13 flavor: ACTS vendors traccc and detray
-# and FetchContents algebra-plugins, so none of them is a system package. Vc is
-# off on both paths (ALGEBRA_PLUGINS_INCLUDE_VC FALSE, DETRAY_VC_* OFF) and
-# dfelibs is dead upstream, pending vendoring of what still uses it.
+# Deliberately absent, as in cuda13: ACTS vendors/FetchContents traccc,
+# detray and algebra-plugins, so none is a system package. Vc is off on both
+# paths; dfelibs is dead upstream.
 #
-# Worth knowing while this flavor exists: ACTS itself has no HIP/ROCm build
-# path today — it only ever calls enable_cuda(), and wires TRACCC_BUILD_CUDA
-# from ACTS_ENABLE_CUDA while never setting TRACCC_BUILD_HIP. The HIP backend
-# lives in vendored traccc (Traccc/device/hip) but nothing in ACTS turns it on,
-# so what this stack currently supports is a standalone traccc/detray HIP
-# build, not an ACTS one.
+# Worth noting: ACTS itself has no HIP/ROCm build path today (only
+# enable_cuda(), never wiring TRACCC_BUILD_HIP). The HIP backend lives in
+# vendored traccc but nothing in ACTS turns it on — this flavor currently
+# supports a standalone traccc/detray HIP build, not an ACTS one.

@@ -2,23 +2,14 @@
 # Merged into the environment via `spack config add -f`. Config sections only —
 # specs live in flavors/cuda13.specs. Express deltas from the base spack.yaml.
 #
-# sm_75 is deliberately the *oldest* architecture CUDA 13 still supports (it
-# dropped Maxwell, Pascal and Volta), which makes it the most permissive target
-# available here: nvcc's `-arch=sm_75` embeds PTX for compute_75 alongside the
-# Turing cubin, and the driver JIT-compiles that PTX onto anything newer. Device
-# code built in this flavor therefore runs on Turing natively and on Ampere/Ada/
-# Hopper/Blackwell through JIT, at the cost of a first-load JIT and no
-# arch-specific tuning. Downstream (ACTS, traccc) still picks its own arch.
+# sm_75 is the oldest architecture CUDA 13 still supports, so its embedded PTX
+# JIT-compiles onto anything newer (Ampere/Ada/Hopper/Blackwell) at the cost of
+# a first-load JIT and no arch-specific tuning. Downstream (ACTS, traccc) still
+# picks its own arch.
 packages:
   all:
-    # Applied only to packages that actually define a `cuda_arch` variant;
-    # packages without it silently ignore this, so it is safe as an `all` entry.
+    # Safe as an `all` entry: packages without a cuda_arch variant ignore it.
     variants: [cuda_arch=75]
-  # ONNX Runtime needs nothing flavor-specific. Upstream builds its CUDA
-  # execution provider once per CUDA major version, and onnxruntime-bin defaults
-  # to `cuda_major=13` for every flavor rather than only here: the EP can only
-  # load where a CUDA toolkit is present, which is this flavor and nowhere else,
-  # so one default keeps all the lockfiles on the same ORT tarball instead of
-  # splitting them over two. What this flavor does add is cuda and cudnn (see
-  # cuda13.specs) — ORT links cuDNN but ships none — which is what turns that
-  # provider from inert into loadable.
+  # onnxruntime-bin defaults to cuda_major=13 for every flavor, not just this
+  # one, so all lockfiles share one ORT tarball. It only becomes loadable here
+  # though, since this flavor is what supplies cuda + cudnn (cuda13.specs).
