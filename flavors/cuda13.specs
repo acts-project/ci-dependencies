@@ -46,16 +46,30 @@ cudnn@9.21.0.82-13
 # engines built version compatible. Flip it here if those ever land upstream.
 tensorrt@11.1.0.106 runtime=full builder=sm75
 
-# traccc GPU tracking R&D stack. Only the packages Spack actually resolves are
-# enabled below; the rest are staged behind for a follow-up once their package
-# names / custom package.py under spack_repo/acts/packages/ are sorted out.
-vecmem +cuda
-covfie +cuda
+# traccc GPU tracking R&D stack. ACTS vendors traccc and detray in its own tree
+# (Traccc/, Detray/, pulled in with add_subdirectory) and FetchContents
+# algebra-plugins under thirdparty/, so none of the three belongs here: there is
+# no ACTS_USE_SYSTEM_DETRAY, algebra-plugins has no system option at all, and
+# Spack carries no traccc package in the first place. What ACTS does take from
+# the environment is vecmem and covfie, at versions it pins exactly
+# (_acts_vecmem_version 1.25.0, _acts_covfie_version 0.15.2). Spack's newest
+# vecmem is 1.25.0, so that one has no headroom — re-check both when ACTS moves.
+vecmem@1.25.0+cuda
+covfie@0.15.6+cuda
 
-# TODO(gpu): re-add once package names are validated against the pinned Spack —
-# `algebra-plugins` errored as "no such package" (aborting before detray/traccc
-# were even reached). These likely need custom packages under
-# spack_repo/acts/packages/ or a different upstream name.
-#   algebra-plugins +vc
-#   detray +cuda
-#   traccc +cuda
+# Alpaka, for traccc's portability backend (TRACCC_BUILD_ALPAKA). `backend=cuda`
+# rather than `cuda_only`, which conflicts with every other backend and would
+# drop the serial one. alpaka is a CudaPackage, so cuda_arch=75 from
+# cuda13.yaml applies here too.
+alpaka backend=cuda
+
+# Deliberately absent:
+#   cccl     CUDA 13.3 already ships CCCL 3.3.3 (lib64/cmake/thrust), and traccc
+#            pins 2.7.0 in extern/cccl while warning against nvcc picking up the
+#            toolkit copy. Taking it from cuda here; reconciling that pin is a
+#            downstream question.
+#   vc       ACTS sets ALGEBRA_PLUGINS_INCLUDE_VC FALSE and detray's Vc plugins
+#            (DETRAY_VC_{AOS,SOA}_PLUGIN) default OFF, so nothing asks for it.
+#            Spack has vc@1.4.5 — detray's exact DETRAY_VC_VERSION — if it
+#            ever gets switched on.
+#   dfelibs  dead upstream; the parts still in use are to be vendored instead.

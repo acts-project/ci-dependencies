@@ -6,9 +6,10 @@ packages:
     # Applied only to packages that define an `amdgpu_target` variant; others
     # ignore it, so it is safe as an `all` entry.
     variants: [amdgpu_target=gfx90a]
-  # `hip`, `llvm-amdgpu` and `hsa-rocr-dev` resolve to the binary packages in
-  # spack_repo/acts/packages/ (they shadow the from-source builtin ones), which
-  # carry only the ROCm releases whose rpm names and hashes are recorded there.
+  # `hip`, `llvm-amdgpu`, `hsa-rocr-dev` and `comgr` resolve to the binary
+  # packages in spack_repo/acts/packages/ (they shadow the from-source builtin
+  # ones), which carry only the ROCm releases whose rpm names and hashes are
+  # recorded there.
   # Pinning keeps the ROCm version an explicit choice of this flavor rather than
   # whatever the concretizer picks once more versions are added.
   hip:
