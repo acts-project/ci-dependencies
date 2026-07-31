@@ -77,6 +77,40 @@ def load_matrix() -> list[dict]:
     return [e for e in entries if e.get("image")]
 
 
+def load_macos_matrix() -> list[dict]:
+    """Parse the macOS build matrix from build.yml.
+
+    These entries have no `image` — build_one.yml runs them on a native macOS
+    runner instead of in Docker — so `host` is the only local_build.py command
+    that can build them at all.
+    """
+    with open(WORKFLOW_FILE) as f:
+        workflow = yaml.safe_load(f)
+
+    entries = (
+        workflow.get("jobs", {})
+        .get("build_macos", {})
+        .get("strategy", {})
+        .get("matrix", {})
+        .get("include", [])
+    )
+    out = []
+    for e in entries:
+        e = dict(e)
+        e.setdefault("label", e.get("os", "macos"))
+        # build_macos's `with:` block hardcodes cxxstd: "23" for every entry;
+        # matrix.include itself never sets it.
+        e.setdefault("cxxstd", "23")
+        out.append(e)
+    return out
+
+
+def load_host_matrix() -> list[dict]:
+    """Every entry `host` can build directly: the container matrix (built without
+    Docker, using the host's own toolchain) plus the macOS matrix."""
+    return load_matrix() + load_macos_matrix()
+
+
 # ---------------------------------------------------------------------------
 # Rich rendering
 # ---------------------------------------------------------------------------
@@ -103,13 +137,14 @@ def describe_entry(entry: dict, index: int | None = None) -> str:
     parts.append(f"[yellow]{entry['compiler']}[/yellow]")
     parts.append(f"C++{entry.get('cxxstd', '23')}")
     parts.append(f"flavor [red]{entry_flavor(entry)}[/red]")
-    parts.append(f"[dim]{entry['image']}[/dim]")
+    platform = entry.get("image") or f"macOS {entry.get('os', '')}, xcode {entry.get('xcode', '')}"
+    parts.append(f"[dim]{platform}[/dim]")
     return " · ".join(parts)
 
 
 def short_entry(entry: dict, index: int | None = None) -> str:
     """Compact form for section rules, which truncate long titles."""
-    name = entry.get("label") or entry["image"].rsplit("/", 1)[-1]
+    name = entry.get("label") or entry.get("image", "").rsplit("/", 1)[-1] or "?"
     prefix = f"#{index} " if index is not None else ""
     return f"{prefix}{name} · {entry_flavor(entry)}"
 
@@ -160,7 +195,7 @@ def build_table(entries: list[dict], indices: list[int] | None = None) -> Table:
         table.add_row(
             str(idx),
             e.get("label", ""),
-            e["image"],
+            e.get("image") or f"(macOS {e.get('os', '')}, xcode {e.get('xcode', '')})",
             e["compiler"],
             str(e.get("cxxstd", "23")),
             entry_flavor(e),
@@ -551,6 +586,125 @@ def execute_build(
 
 
 # ---------------------------------------------------------------------------
+# Host (no-Docker) builds
+# ---------------------------------------------------------------------------
+
+# Persistent envs live here (not under build/, which is the Docker bind-mount
+# dir) so a host build can never collide with a container build of the same
+# entry, and so they survive independently of --build-dir usage.
+HOST_ENV_ROOT = REPO_ROOT / ".local_build" / "host-envs"
+
+
+def entry_slug(e: dict) -> str:
+    """Filesystem-safe id for an entry, used to name its persistent host env dir.
+
+    Mirrors TARGET_TRIPLET (compiler_cxxstd_flavor) but keyed by label/image
+    instead of arch, since arch is whatever this host actually is.
+    """
+    base = e.get("label") or (e.get("image", "").rsplit("/", 1)[-1] if e.get("image") else "host")
+    compiler = e["compiler"].replace("@", "-").replace("/", "-").replace(" ", "")
+    slug = f"{base}_{compiler}_cxx{e.get('cxxstd', '23')}"
+    flavor = entry_flavor(e)
+    if flavor != "host":
+        slug += f"_{flavor}"
+    return slug
+
+
+def host_env_dir_for(entry: dict, override: Path | None) -> Path:
+    return override if override is not None else HOST_ENV_ROOT / entry_slug(entry)
+
+
+def platform_mismatch_warning(entry: dict) -> str | None:
+    """A nudge, not a block: flag an entry whose assumptions likely don't match
+    this host (a gcc-toolset compiler_path, an apple-clang compiler, ...)."""
+    is_macos_entry = "image" not in entry
+    host_is_macos = sys.platform == "darwin"
+    if is_macos_entry and not host_is_macos:
+        return "This is a macOS matrix entry; the current host is not macOS."
+    if not is_macos_entry and host_is_macos:
+        return (
+            "This is a Linux container matrix entry (its compiler/compiler_path "
+            "target a Linux base image); running it natively on macOS is untested."
+        )
+    return None
+
+
+def execute_host_build(
+    entry: dict,
+    spack_root: str,
+    env_dir: Path,
+    dry_run: bool,
+    shell: bool,
+    jobs: int | None = None,
+    index: int | None = None,
+) -> None:
+    """Run spack_build.sh directly on the host, installing into `env_dir`.
+
+    No Docker: SPACK_ROOT/COMPILER/COMPILER_PATH/CXXSTD/FLAVOR are passed as
+    real env vars instead of `docker run -e`, and `env_dir` is the actual host
+    directory spack_build.sh runs in (it symlinks spack_repo and creates
+    .spack-env there), so it persists across runs — the env is reused and
+    refreshed, not recreated, if `env_dir` already holds one.
+    """
+    warning = platform_mismatch_warning(entry)
+    if warning:
+        console.print(f"[yellow]Warning:[/yellow] {warning}")
+
+    action = "Shell" if shell else "Host build"
+    console.print(f"\n[bold]{action}:[/bold] {describe_entry(entry, index)}")
+    console.print(f"[bold]Env dir:[/bold] [dim]{env_dir}[/dim]")
+
+    if shell:
+        require_built_env(env_dir, dry_run)
+
+    env = os.environ.copy()
+    env["SPACK_ROOT"] = spack_root
+    env["COMPILER"] = entry["compiler"]
+    env["COMPILER_PATH"] = entry.get("compiler_path", "")
+    env["CXXSTD"] = str(entry.get("cxxstd", "23"))
+    env["FLAVOR"] = entry_flavor(entry)
+    if jobs is not None:
+        env["BUILD_JOBS"] = str(jobs)
+
+    if shell:
+        cmd = [
+            "bash",
+            "-c",
+            f'source "{spack_root}/share/spack/setup-env.sh" && '
+            f'spack env activate -d "{env_dir}" && exec "${{SHELL:-bash}}"',
+        ]
+    else:
+        cmd = ["bash", str(REPO_ROOT / "spack_build.sh")]
+
+    console.print("\n[bold]Command:[/bold]")
+    console.print("  " + " ".join(cmd), style="dim")
+
+    if dry_run:
+        console.print("\n[yellow]Dry run — not executing.[/yellow]")
+        return
+
+    env_dir.mkdir(parents=True, exist_ok=True)
+    console.print(f"\n[bold green]Starting:[/bold green] {describe_entry(entry, index)}\n")
+    result = subprocess.run(cmd, cwd=env_dir, env=env)
+    if result.returncode != 0:
+        console.print(
+            f"\n[bold red]{'Shell exited with an error' if shell else 'Build failed'}"
+            f"[/bold red] (exit code [bold]{result.returncode}[/bold])"
+        )
+        console.print(f"  build:   {describe_entry(entry, index)}")
+        console.print(f"  env dir: [dim]{env_dir}[/dim]")
+        raise typer.Exit(result.returncode)
+
+    if not shell:
+        console.print(f"\n[bold green]Build succeeded:[/bold green] {describe_entry(entry, index)}")
+        console.print(
+            f"  Installed into [dim]{env_dir}[/dim] — it persists, so re-running this "
+            "build reuses and updates it. Activate it later with:\n"
+            f"  [bold]spack env activate -d {env_dir}[/bold]"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Entry selection helpers
 # ---------------------------------------------------------------------------
 
@@ -578,6 +732,9 @@ def entry_searchable(e: dict) -> str:
             # share image, compiler and cxxstd with the plain CPU build.
             e.get("label", ""),
             entry_flavor(e),
+            # macOS entries have no image/label to search by otherwise.
+            e.get("os", ""),
+            e.get("xcode", ""),
         ]
     ).lower()
 
@@ -628,9 +785,18 @@ def resolve_entry(entries: list[dict], terms: list[str]) -> int:
 
 
 @app.command("list")
-def list_builds():
+def list_builds(
+    host: Annotated[
+        bool,
+        typer.Option(
+            "--host",
+            help="Include the macOS matrix alongside the container matrix "
+            "(the set `host` can build; `run`/`push` only ever see the container one).",
+        ),
+    ] = False,
+):
     """List all container builds from the CI matrix."""
-    entries = load_matrix()
+    entries = load_host_matrix() if host else load_matrix()
     console.print(build_table(entries))
 
 
@@ -900,6 +1066,136 @@ def push_builds(
     sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
     require_built_env(build_dir, dry_run)
     execute_push(entries[idx], sr, build_dir, dry_run, user, index=idx)
+
+
+@app.command("host")
+def host_build(
+    selector: Annotated[
+        Optional[list[str]],
+        typer.Argument(
+            help="One or more substrings to match against compiler/image/os/cxxstd (AND logic), or a single index."
+        ),
+    ] = None,
+    spack_root: Annotated[
+        Optional[str],
+        typer.Option(
+            "--spack-root", "-s", help="Explicit spack root path; overrides --ci-spack."
+        ),
+    ] = None,
+    ci_spack: Annotated[
+        bool,
+        typer.Option(
+            "--ci-spack/--no-ci-spack",
+            help="Use a cloned & patched spack matching CI (default). --no-ci-spack auto-detects via 'spack location -r'.",
+        ),
+    ] = True,
+    spack_ref: Annotated[
+        str,
+        typer.Option("--spack-ref", help="Git ref of spack to clone for --ci-spack."),
+    ] = "develop",
+    refresh_spack: Annotated[
+        bool,
+        typer.Option(
+            "--refresh-spack",
+            help="Fetch the latest --spack-ref into the cached clone before building.",
+        ),
+    ] = False,
+    env_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--env-dir",
+            "-e",
+            help="Persistent spack env directory. Default: .local_build/host-envs/<slug> "
+            "derived from the selected build, reused across runs. Not allowed with --all.",
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run", "-n", help="Print the command without running it."
+        ),
+    ] = False,
+    shell: Annotated[
+        bool,
+        typer.Option(
+            "--shell",
+            help="Activate the persisted env and open a shell instead of building; "
+            "requires a prior successful build in that env dir.",
+        ),
+    ] = False,
+    run_all: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            help="Build sequentially: every config matching the selector, or the whole matrix if no selector is given.",
+        ),
+    ] = False,
+    jobs: Annotated[
+        Optional[int],
+        typer.Option(
+            "--jobs",
+            "-j",
+            min=1,
+            help="Total build parallelism (spack 'config:build_jobs'); default is spack's own min(16, ncpu).",
+        ),
+    ] = (os.cpu_count() or 1),
+):
+    """Build a config directly on this host, no Docker — installs into a
+    persistent spack env under .local_build/host-envs/ so it sticks around for
+    later testing (e.g. building ACTS against a GPU flavor). This is also the
+    only way to build the macOS matrix, which has no container image.
+    """
+    entries = load_host_matrix()
+
+    if run_all:
+        if env_dir is not None:
+            console.print(
+                "[red]--env-dir can't be combined with --all[/red] "
+                "(each build needs its own directory)."
+            )
+            raise typer.Exit(1)
+        if selector:
+            indices = resolve_entries(entries, selector)
+            if not indices:
+                console.print(
+                    f"[red]No builds matching {selector_label(selector)}[/red]"
+                )
+                raise typer.Exit(1)
+        else:
+            indices = list(range(len(entries)))
+        sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
+        announce_plan("Host build", entries, indices)
+        for n, i in enumerate(indices):
+            console.rule(
+                f"[bold]Build {n + 1} / {len(indices)}:[/bold] {short_entry(entries[i], i)}"
+            )
+            try:
+                execute_host_build(
+                    entries[i],
+                    sr,
+                    host_env_dir_for(entries[i], None),
+                    dry_run,
+                    shell,
+                    jobs,
+                    index=i,
+                )
+            except typer.Exit:
+                report_sequence_failure("Host build", entries, indices, n)
+                raise
+        console.print(
+            f"\n[bold green]All {len(indices)} host build(s) completed successfully.[/bold green]"
+        )
+        return
+
+    if selector is None or len(selector) == 0:
+        idx = select_interactively(entries, list(range(len(entries))))
+    else:
+        idx = resolve_entry(entries, selector)
+
+    sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
+    execute_host_build(
+        entries[idx], sr, host_env_dir_for(entries[idx], env_dir), dry_run, shell, jobs, index=idx
+    )
 
 
 @app.callback(invoke_without_command=True)
