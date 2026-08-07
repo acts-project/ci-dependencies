@@ -40,6 +40,11 @@ SPACK_GIT_URL = "https://github.com/spack/spack.git"
 SPACK_PATCHES_DIR = REPO_ROOT / "spack_patches"
 CI_SPACK_DIR = REPO_ROOT / ".local_build" / "spack"
 
+# Writable home for the container when it runs as the host user (see
+# _user_docker_args). The host home isn't mounted, so spack/git get a persisted
+# dir here for ~/.spack, bootstrap store and caches instead of a throwaway root.
+CI_HOME_DIR = REPO_ROOT / ".local_build" / "home"
+
 # Containers launched by this tool are tagged so leftovers from an interrupted
 # run can be cleaned up before the next build — a still-running container holds
 # an flock on the bind-mounted spack root and makes spack hang at
@@ -77,6 +82,63 @@ def load_matrix() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+def entry_flavor(e: dict) -> str:
+    """Accelerator flavor of a matrix entry, defaulted like build.yml does."""
+    return e.get("flavor", "host")
+
+
+def describe_entry(entry: dict, index: int | None = None) -> str:
+    """One line naming a build unambiguously (Rich markup).
+
+    Every field that can differ between matrix entries is here on purpose: two
+    entries can share an image, a compiler and a cxxstd and differ only in
+    flavor, so a message that omits one of them cannot identify the build it is
+    talking about.
+    """
+    parts = []
+    if index is not None:
+        parts.append(f"[bold cyan]#{index}[/bold cyan]")
+    if entry.get("label"):
+        parts.append(f"[bold green]{entry['label']}[/bold green]")
+    parts.append(f"[yellow]{entry['compiler']}[/yellow]")
+    parts.append(f"C++{entry.get('cxxstd', '23')}")
+    parts.append(f"flavor [red]{entry_flavor(entry)}[/red]")
+    parts.append(f"[dim]{entry['image']}[/dim]")
+    return " · ".join(parts)
+
+
+def short_entry(entry: dict, index: int | None = None) -> str:
+    """Compact form for section rules, which truncate long titles."""
+    name = entry.get("label") or entry["image"].rsplit("/", 1)[-1]
+    prefix = f"#{index} " if index is not None else ""
+    return f"{prefix}{name} · {entry_flavor(entry)}"
+
+
+def announce_plan(action: str, entries: list[dict], indices: list[int]) -> None:
+    """List, in order, what a sequential run is about to do."""
+    console.print(f"\n[bold]{action} plan[/bold] ({len(indices)} in sequence):")
+    for n, i in enumerate(indices):
+        console.print(f"  {n + 1}. {describe_entry(entries[i], i)}")
+
+
+def report_sequence_failure(
+    action: str, entries: list[dict], indices: list[int], failed_at: int
+) -> None:
+    """Say which step of a sequential run failed, and what is left unrun."""
+    i = indices[failed_at]
+    console.print(
+        f"\n[bold red]{action} sequence aborted[/bold red] at step "
+        f"{failed_at + 1} / {len(indices)}: {describe_entry(entries[i], i)}"
+    )
+    if failed_at:
+        done = ", ".join(short_entry(entries[j], j) for j in indices[:failed_at])
+        console.print(f"  [green]succeeded:[/green] {done}")
+    remaining = indices[failed_at + 1 :]
+    if remaining:
+        skipped = ", ".join(short_entry(entries[j], j) for j in remaining)
+        console.print(f"  [yellow]not run:[/yellow] {skipped}")
+
+
 def build_table(entries: list[dict], indices: list[int] | None = None) -> Table:
     """Render entries as a Rich table. `indices` are the global indices to display."""
     if indices is None:
@@ -84,18 +146,24 @@ def build_table(entries: list[dict], indices: list[int] | None = None) -> Table:
 
     table = Table(title="Container Build Matrix", show_lines=True, highlight=True)
     table.add_column("#", style="bold cyan", justify="right", no_wrap=True)
+    table.add_column("Label", style="bold green")
     table.add_column("Image", style="green")
     table.add_column("Compiler", style="yellow")
     table.add_column("C++ Std", style="magenta", justify="center")
+    # Several entries share an image and differ only by flavor, so it has to be
+    # visible to tell them apart here and in the selector.
+    table.add_column("Flavor", style="red", justify="center")
     table.add_column("Default", style="blue", justify="center")
 
     for idx in indices:
         e = entries[idx]
         table.add_row(
             str(idx),
+            e.get("label", ""),
             e["image"],
             e["compiler"],
             str(e.get("cxxstd", "23")),
+            entry_flavor(e),
             "✓" if e.get("default") else "",
         )
     return table
@@ -248,11 +316,40 @@ def cleanup_stale_containers() -> None:
     subprocess.run(["docker", "rm", "-f", *ids], capture_output=True, text=True)
 
 
+def _user_docker_args(run_as_user: bool) -> list[str]:
+    """`docker run` args to run the container as the host user.
+
+    Without this the container runs as root and every file it writes into the
+    bind-mounted spack root and build dir is created root-owned on the host,
+    which later breaks host-side git ops on the cached spack clone and leaves
+    caches you can't clean up without sudo.
+
+    /etc/passwd and /etc/group are mounted read-only so the uid/gid resolve to a
+    name inside the container (spack and git call getpwuid and error on an
+    unknown uid); HOME is redirected to a persisted, writable dir since the host
+    home isn't mounted. Steps that genuinely need root — the apt/dnf installs in
+    opengl.sh and the crypt.h shim in spack_build.sh — fall back to sudo.
+    """
+    if not run_as_user or not hasattr(os, "getuid"):
+        return []
+    CI_HOME_DIR.mkdir(parents=True, exist_ok=True)
+    return [
+        "--user",
+        f"{os.getuid()}:{os.getgid()}",
+        "-v/etc/passwd:/etc/passwd:ro",
+        "-v/etc/group:/etc/group:ro",
+        f"-v{CI_HOME_DIR.resolve()}:/home/build",
+        "-e",
+        "HOME=/home/build",
+    ]
+
+
 def _docker_run_base(
     entry: dict,
     spack_root: str,
     build_dir: Path,
     github_env_file: Path,
+    run_as_user: bool = True,
 ) -> list[str]:
     """Common `docker run` prefix (mounts + env + workdir) shared by build and push."""
     return [
@@ -261,6 +358,7 @@ def _docker_run_base(
         "--rm",
         "--label",
         CONTAINER_LABEL,
+        *_user_docker_args(run_as_user),
         f"-v{REPO_ROOT.resolve()}:/src",
         f"-v{spack_root}:/spack",
         f"-v{build_dir.resolve()}:/build",
@@ -273,6 +371,11 @@ def _docker_run_base(
         f"COMPILER_PATH={entry.get('compiler_path', '')}",
         "-e",
         f"CXXSTD={str(entry.get('cxxstd', '23'))}",
+        # Without this every entry would build the plain CPU stack, silently:
+        # spack_build.sh defaults FLAVOR to `host`, and the flavor is the only
+        # thing that distinguishes e.g. ubuntu26.04-rocm from ubuntu26.04.
+        "-e",
+        f"FLAVOR={entry_flavor(entry)}",
         "-e",
         "GITHUB_ENV=/github_env",
         "-w",
@@ -287,8 +390,9 @@ def build_docker_cmd(
     github_env_file: Path,
     shell: bool,
     jobs: int | None = None,
+    run_as_user: bool = True,
 ) -> list[str]:
-    cmd = _docker_run_base(entry, spack_root, build_dir, github_env_file)
+    cmd = _docker_run_base(entry, spack_root, build_dir, github_env_file, run_as_user)
     image = entry["image"]
 
     if jobs is not None:
@@ -314,6 +418,7 @@ def build_push_cmd(
     spack_root: str,
     build_dir: Path,
     github_env_file: Path,
+    run_as_user: bool = True,
 ) -> list[str]:
     """Command to push the just-built env to the buildcache mirror (spack_push.sh).
 
@@ -321,7 +426,7 @@ def build_push_cmd(
     from the host environment by name only (no value), so they never appear in
     the printed command.
     """
-    cmd = _docker_run_base(entry, spack_root, build_dir, github_env_file)
+    cmd = _docker_run_base(entry, spack_root, build_dir, github_env_file, run_as_user)
     cmd += ["-e", f"BASE_IMAGE={entry['image']}"]
     for var in PUSH_CRED_VARS:
         if os.environ.get(var):
@@ -335,13 +440,20 @@ def execute_push(
     spack_root: str,
     build_dir: Path,
     dry_run: bool,
+    run_as_user: bool = True,
+    index: int | None = None,
 ) -> None:
     """Push an already-built environment in `build_dir` to the buildcache mirror."""
     github_env_file = build_dir / "github_env"
     if not dry_run:
         github_env_file.touch(exist_ok=True)
 
-    push_cmd = build_push_cmd(entry, spack_root, build_dir, github_env_file)
+    console.print(f"\n[bold]Pushing:[/bold] {describe_entry(entry, index)}")
+    console.print(f"[bold]From:[/bold] [dim]{build_dir}[/dim]")
+
+    push_cmd = build_push_cmd(
+        entry, spack_root, build_dir, github_env_file, run_as_user
+    )
     console.print("\n[bold]Push command:[/bold]")
     console.print("  " + " \\\n    ".join(push_cmd), style="dim")
 
@@ -358,8 +470,11 @@ def execute_push(
     push_result = subprocess.run(push_cmd)
     if push_result.returncode != 0:
         console.print(
-            f"\n[bold red]Push failed[/bold red] with exit code [bold]{push_result.returncode}[/bold]"
+            f"\n[bold red]Push failed[/bold red] "
+            f"(exit code [bold]{push_result.returncode}[/bold])"
         )
+        console.print(f"  build:     {describe_entry(entry, index)}")
+        console.print(f"  build dir: [dim]{build_dir}[/dim]")
         raise typer.Exit(push_result.returncode)
 
 
@@ -371,6 +486,8 @@ def execute_build(
     shell: bool,
     push: bool = False,
     jobs: int | None = None,
+    run_as_user: bool = True,
+    index: int | None = None,
 ) -> None:
     build_dir.mkdir(parents=True, exist_ok=True)
     github_env_file = build_dir / "github_env"
@@ -379,33 +496,58 @@ def execute_build(
     # Pushing only makes sense after a real, non-interactive build.
     push = push and not shell
 
-    cmd = build_docker_cmd(entry, spack_root, build_dir, github_env_file, shell, jobs)
+    cmd = build_docker_cmd(
+        entry, spack_root, build_dir, github_env_file, shell, jobs, run_as_user
+    )
+
+    # Announced before the command and before any work, so an interrupted or
+    # scrolled-off run still says which configuration was being built.
+    console.print(f"\n[bold]Build:[/bold] {describe_entry(entry, index)}")
+    console.print(f"[bold]Build dir:[/bold] [dim]{build_dir}[/dim]")
 
     console.print("\n[bold]Docker command:[/bold]")
     console.print("  " + " \\\n    ".join(cmd), style="dim")
 
     if dry_run:
         if push:
-            execute_push(entry, spack_root, build_dir, dry_run=True)
+            execute_push(
+                entry,
+                spack_root,
+                build_dir,
+                dry_run=True,
+                run_as_user=run_as_user,
+                index=index,
+            )
         else:
             console.print("\n[yellow]Dry run — not executing.[/yellow]")
         return
 
     console.print(
-        f"\n[bold green]Starting:[/bold green] "
-        f"[yellow]{entry['compiler']}[/yellow] · "
-        f"[green]{entry['image']}[/green]"
-        f" (C++{entry.get('cxxstd', '23')})\n"
+        f"\n[bold green]Starting:[/bold green] {describe_entry(entry, index)}\n"
     )
     result = subprocess.run(cmd)
     if result.returncode != 0:
         console.print(
-            f"\n[bold red]Build failed[/bold red] with exit code [bold]{result.returncode}[/bold]"
+            f"\n[bold red]Build failed[/bold red] (exit code [bold]{result.returncode}[/bold])"
         )
+        console.print(f"  build:     {describe_entry(entry, index)}")
+        console.print(f"  build dir: [dim]{build_dir}[/dim]")
+        console.print(f"  spack env: [dim]{build_dir / '.spack-env'}[/dim]")
         raise typer.Exit(result.returncode)
 
+    console.print(
+        f"\n[bold green]Build succeeded:[/bold green] {describe_entry(entry, index)}"
+    )
+
     if push:
-        execute_push(entry, spack_root, build_dir, dry_run=False)
+        execute_push(
+            entry,
+            spack_root,
+            build_dir,
+            dry_run=False,
+            run_as_user=run_as_user,
+            index=index,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -432,6 +574,10 @@ def entry_searchable(e: dict) -> str:
             e.get("compiler", ""),
             e.get("image", ""),
             str(e.get("cxxstd", "23")),
+            # label and flavor are the only handles on the GPU entries: they
+            # share image, compiler and cxxstd with the plain CPU build.
+            e.get("label", ""),
+            entry_flavor(e),
         ]
     ).lower()
 
@@ -571,6 +717,13 @@ def run_build(
             help="Total build parallelism (spack 'config:build_jobs'); default is spack's own min(16, ncpu).",
         ),
     ] = (os.cpu_count() or 1),
+    user: Annotated[
+        bool,
+        typer.Option(
+            "--user/--no-user",
+            help="Run the container as the host user so bind-mounted files aren't root-owned (default). --no-user runs as root.",
+        ),
+    ] = True,
 ):
     """Run a container build locally in Docker."""
     entries = load_matrix()
@@ -589,11 +742,29 @@ def run_build(
         else:
             indices = list(range(len(entries)))
         sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
+        announce_plan("Build", entries, indices)
         for n, i in enumerate(indices):
-            console.rule(f"[bold]Build {n + 1} / {len(indices)} (#{i})[/bold]")
-            execute_build(
-                entries[i], sr, build_dir / f"build_{i}", dry_run, shell, push, jobs
+            console.rule(
+                f"[bold]Build {n + 1} / {len(indices)}:[/bold] {short_entry(entries[i], i)}"
             )
+            try:
+                execute_build(
+                    entries[i],
+                    sr,
+                    build_dir / f"build_{i}",
+                    dry_run,
+                    shell,
+                    push,
+                    jobs,
+                    user,
+                    index=i,
+                )
+            except typer.Exit:
+                report_sequence_failure("Build", entries, indices, n)
+                raise
+        console.print(
+            f"\n[bold green]All {len(indices)} build(s) completed successfully.[/bold green]"
+        )
         return
 
     if selector is None or len(selector) == 0:
@@ -602,7 +773,9 @@ def run_build(
         idx = resolve_entry(entries, selector)
 
     sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
-    execute_build(entries[idx], sr, build_dir, dry_run, shell, push, jobs)
+    execute_build(
+        entries[idx], sr, build_dir, dry_run, shell, push, jobs, user, index=idx
+    )
 
 
 def require_built_env(build_dir: Path, dry_run: bool) -> None:
@@ -677,6 +850,13 @@ def push_builds(
             help="Remove leftover local-build containers before starting (default).",
         ),
     ] = True,
+    user: Annotated[
+        bool,
+        typer.Option(
+            "--user/--no-user",
+            help="Run the container as the host user so bind-mounted files aren't root-owned (default). --no-user runs as root.",
+        ),
+    ] = True,
 ) -> None:
     """Push already-built environment(s) to the buildcache mirror, without rebuilding."""
     entries = load_matrix()
@@ -688,16 +868,28 @@ def push_builds(
         if selector:
             indices = resolve_entries(entries, selector)
             if not indices:
-                console.print(f"[red]No builds matching {selector_label(selector)}[/red]")
+                console.print(
+                    f"[red]No builds matching {selector_label(selector)}[/red]"
+                )
                 raise typer.Exit(1)
         else:
             indices = list(range(len(entries)))
         sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
+        announce_plan("Push", entries, indices)
         for n, i in enumerate(indices):
-            console.rule(f"[bold]Push {n + 1} / {len(indices)} (#{i})[/bold]")
+            console.rule(
+                f"[bold]Push {n + 1} / {len(indices)}:[/bold] {short_entry(entries[i], i)}"
+            )
             bd = build_dir / f"build_{i}"
-            require_built_env(bd, dry_run)
-            execute_push(entries[i], sr, bd, dry_run)
+            try:
+                require_built_env(bd, dry_run)
+                execute_push(entries[i], sr, bd, dry_run, user, index=i)
+            except typer.Exit:
+                report_sequence_failure("Push", entries, indices, n)
+                raise
+        console.print(
+            f"\n[bold green]All {len(indices)} push(es) completed successfully.[/bold green]"
+        )
         return
 
     if selector is None or len(selector) == 0:
@@ -707,7 +899,7 @@ def push_builds(
 
     sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
     require_built_env(build_dir, dry_run)
-    execute_push(entries[idx], sr, build_dir, dry_run)
+    execute_push(entries[idx], sr, build_dir, dry_run, user, index=idx)
 
 
 @app.callback(invoke_without_command=True)

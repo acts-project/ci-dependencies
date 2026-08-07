@@ -1,0 +1,37 @@
+# Extra specs for the `cuda13` flavor (one per line; `#` comments allowed).
+# Added via `spack add` on top of the base environment. cuda_arch=75 comes from
+# flavors/cuda13.yaml.
+
+# CUDA toolkit. Version floor is set by the base image: gcc@15 (ubuntu26.04)
+# conflicts with %cuda@:12.9, and glibc 2.42+ needs cuda@13.1: (C23 exception
+# specs of cospi/sinpi/rsqrt changed in glibc 2.41). Re-check both if the base
+# image or compiler changes.
+cuda@13.3.0
+
+# cuDNN for ONNX Runtime's CUDA execution provider (linked, not bundled). The
+# `-13` suffix ties depends_on to cuda@13, unifying with the toolkit above.
+cudnn@9.21.0.82-13
+
+# TensorRT, for ACTS' Gnn plugin (deserializes prebuilt .engine files). Not in
+# upstream Spack; spack_repo/acts/packages/tensorrt unpacks NVIDIA's debs.
+# Lives here rather than its own flavor to avoid duplicating the cuda+cudnn
+# download. `builder=sm75` (matching cuda_arch) trims the unused builder
+# resources for other architectures: 2628 MB -> 922 MB installed, same
+# libraries/symbols ACTS links. `runtime=lean` isn't reachable — ACTS links
+# nvinfer_plugin, which pulls the full libnvinfer back via DT_NEEDED anyway.
+tensorrt@11.1.0.106 runtime=full builder=sm75
+
+# traccc/detray/algebra-plugins are vendored/FetchContent'd by ACTS, not taken
+# from the environment. vecmem and covfie are, pinned to ACTS' exact versions
+# (_acts_vecmem_version / _acts_covfie_version) — re-check when ACTS moves.
+vecmem@1.25.0+cuda
+covfie@0.15.6+cuda
+
+# Alpaka, traccc's portability backend. `backend=cuda` not `cuda_only`, which
+# would drop the serial backend too.
+alpaka backend=cuda
+
+# Deliberately absent:
+#   cccl     cuda@13.3 already ships CCCL 3.3.3; traccc pins 2.7.0 separately.
+#   vc       Off in ACTS/detray by default, so nothing requests it.
+#   dfelibs  Dead upstream; slated for vendoring instead.

@@ -12,11 +12,28 @@ import spack.spec
 from spack.util.prefix import Prefix
 
 
+def _gpu_asset(version: str, cuda_major: str) -> str:
+    """Name of the linux x86_64 GPU tarball for a release.
+
+    Upstream ships one GPU build per CUDA major version, and has renamed the
+    assets twice: `gpu_cuda13` appears from 1.24.1, and from 1.27.0 the CUDA 12
+    build is `gpu_cuda12` rather than the historical bare `gpu`. Deriving the
+    name here means a version bump fails on a checksum rather than on a 404
+    from a stale hardcoded asset name.
+    """
+    if cuda_major == "13":
+        return f"onnxruntime-linux-x64-gpu_cuda13-{version}.tgz"
+    if Version(version) >= Version("1.27.0"):
+        return f"onnxruntime-linux-x64-gpu_cuda12-{version}.tgz"
+    return f"onnxruntime-linux-x64-gpu-{version}.tgz"
+
+
 def _add_version(
     version: str,
     sha256: str,
     sha256_linux_x86_64: Optional[str] = None,
     sha256_linux_x86_64_gpu: Optional[str] = None,
+    sha256_linux_x86_64_gpu_cuda13: Optional[str] = None,
     sha256_linux_aarch64: Optional[str] = None,
     sha256_darwin_aarch64: Optional[str] = None,
     sha256_darwin_x86_64: Optional[str] = None,
@@ -27,11 +44,31 @@ def _add_version(
     if sha256_linux_x86_64_gpu is not None:
         resource(
             name=f"linux-x86_64-gpu-v{version}",
-            url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/onnxruntime-linux-x64-gpu-{version}.tgz",
+            url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/{_gpu_asset(version, '12')}",
             sha256=sha256_linux_x86_64_gpu,
-            when=f"@{version} +gpu platform=linux target=x86_64:",
+            when=f"@{version} +gpu cuda_major=12 platform=linux target=x86_64:",
             destination="./",
             placement="binaries",
+        )
+
+    if sha256_linux_x86_64_gpu_cuda13 is not None:
+        resource(
+            name=f"linux-x86_64-gpu-cuda13-v{version}",
+            url=f"https://github.com/microsoft/onnxruntime/releases/download/v{version}/{_gpu_asset(version, '13')}",
+            sha256=sha256_linux_x86_64_gpu_cuda13,
+            when=f"@{version} +gpu cuda_major=13 platform=linux target=x86_64:",
+            destination="./",
+            placement="binaries",
+        )
+    else:
+        # No CUDA 13 tarball upstream (they start at 1.24.1). Asking for one
+        # should fail rather than quietly fetch the CUDA 12 build — though with
+        # cuda_major defaulting to 13, what this normally does is send such a
+        # release back to 12 instead of failing to concretize at all.
+        conflicts(
+            "cuda_major=13",
+            when=f"@{version}",
+            msg=f"onnxruntime {version} has no CUDA 13 build upstream (they start at 1.24.1)",
         )
 
     if sha256_linux_x86_64 is not None:
@@ -113,6 +150,29 @@ class OnnxruntimeBin(Package):
     #     description="Install with GPU support",
     # )
 
+    # Which CUDA the prebuilt CUDA execution provider links against. It is not a
+    # `depends_on`: `+gpu` is the default on linux x86_64, and making the plain
+    # CPU stack drag in a CUDA toolkit for a provider it never loads would be a
+    # poor trade. A flavor that wants the EP to actually load supplies cuda and
+    # cudnn itself (see flavors/cuda13.*).
+    #
+    # 13 is the default so that every flavor resolves to the *same* ORT spec:
+    # only the cuda13 flavor ships a CUDA toolkit, so that is the only stack
+    # where the provider can load at all, and elsewhere the EP is inert either
+    # way and ORT runs on CPU. One default therefore means one tarball, one
+    # buildcache entry, and no ORT diff between the lockfiles.
+    #
+    # Releases with no CUDA 13 build conflict on this value (see _add_version),
+    # so they fall back to 12 rather than failing to concretize.
+    variant(
+        "cuda_major",
+        values=("12", "13"),
+        multi=False,
+        default="13",
+        when="+gpu",
+        description="CUDA major version the GPU (CUDA EP) build targets",
+    )
+
     conflicts(
         "+gpu", when="platform=darwin", msg="GPU variant is not supported on macOS"
     )
@@ -160,6 +220,7 @@ class OnnxruntimeBin(Package):
         sha256_linux_aarch64="866109a9248d057671a039b9d725be4bd86888e3754140e6701ec621be9d4d7e",
         sha256_linux_x86_64="3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747",
         sha256_linux_x86_64_gpu="c5f804ff5d239b436fa59e9f2fb288a39f7eb9552f6a636c8b71e792e91a8808",
+        sha256_linux_x86_64_gpu_cuda13="fdc6eb18317b4eaeda8b3b86595e5da7e853f72bac67ccac9b04ffc20c9f7fe0",
     )
 
     def install(self, spec: spack.spec.Spec, prefix: Prefix) -> None:

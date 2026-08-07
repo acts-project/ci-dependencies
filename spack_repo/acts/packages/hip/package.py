@@ -1,0 +1,270 @@
+# Copyright Spack Project Developers. See COPYRIGHT file for details.
+#
+# SPDX-License-Identifier: (Apache-2.0 OR MIT)
+
+import os
+import shutil
+
+from spack_repo.acts.packages.hip.rpm import extract_rpm
+from spack_repo.builtin.build_systems.generic import Package
+
+from spack.package import *
+
+# ROCm components, as published by AMD in rpm form. One dict per ROCm release:
+# {component: (rpm file name, sha256)}. The first entry is used as the package's
+# "version" download, the rest are fetched as resources; all of them are
+# unpacked into the same prefix, which reproduces the /opt/rocm-x.y.z layout
+# that AMD ships and that Spack already knows how to drive as an external ROCm.
+#
+# rhel8 rpms on purpose:
+#   * their payload is xz, which `rpm.py` unpacks with the stdlib alone
+#     (rhel9+ switched to zstd, which needs python 3.14 or an extra module), and
+#   * they are built against glibc 2.28, so they run on every image in the CI
+#     matrix (alma9/10, ubuntu 24.04/26.04) regardless of its glibc.
+#
+# This set is exactly what is needed to *compile* HIP code and link against the
+# HIP runtime; the ML libraries (rocBLAS, MIOpen, ...) and the profiling and
+# debugging tools are deliberately left out. `lib/cmake` ends up with hip,
+# hip-lang, AMDDeviceLibs, amd_comgr, hsa-runtime64, hsakmt, hiprtc, rocm-core
+# and rocprofiler-register, which covers every find_dependency() that
+# hip-config.cmake and hip-lang-config.cmake issue.
+_rpms = {
+    "6.4.3": {
+        "rocm-core": (
+            "rocm-core-6.4.3.60403-128.el8.x86_64.rpm",
+            "bdf3b988c8dfdc066efccca3c8e698613813c4d7bd037660105ca903a18503db",
+        ),
+        "rocm-llvm": (
+            "rocm-llvm-19.0.0.25224.60403-128.el8.x86_64.rpm",
+            "4e52eeb81136f62d42bdc12dee6a22bf7b13e05f2330295bae93c131629e3b13",
+        ),
+        "rocm-device-libs": (
+            "rocm-device-libs-1.0.0.60403-128.el8.x86_64.rpm",
+            "24138877252d5c2c3928c11f6e6a6272a349bec1cb99e57425680470e6941a26",
+        ),
+        "hsa-rocr": (
+            "hsa-rocr-1.15.0.60403-128.el8.x86_64.rpm",
+            "6458b700adc4ff7a52d2528cce6352c1a1dc4403330f8d113681a7f06caa3d11",
+        ),
+        "hsa-rocr-devel": (
+            "hsa-rocr-devel-1.15.0.60403-128.el8.x86_64.rpm",
+            "2ef7e03b961f80d2fe0990ddc48f5d84c7737886fb3bcac161ebbd29f87c1a47",
+        ),
+        "comgr": (
+            "comgr-3.0.0.60403-128.el8.x86_64.rpm",
+            "43a74f024cf811d4a8b662a4973cc5933d85e132f0913274bfc4bcc57b6758fa",
+        ),
+        "hip-runtime-amd": (
+            "hip-runtime-amd-6.4.43484.60403-128.el8.x86_64.rpm",
+            "980f020c68bab9b730d8e36f64efbc73c751f3d5d83c931432c9268db86b98fb",
+        ),
+        "hip-devel": (
+            "hip-devel-6.4.43484.60403-128.el8.x86_64.rpm",
+            "0de48fafca935a778da65750f5945dd056a70a235136231218fffda2362cf3e4",
+        ),
+        "hipcc": (
+            "hipcc-1.1.1.60403-128.el8.x86_64.rpm",
+            "ee894d158c289a6c770a4d33d4e8de37e15aab3b8bfd505fb1a0f2fbbb90a9ef",
+        ),
+        "rocprofiler-register": (
+            "rocprofiler-register-0.4.0.60403-128.el8.x86_64.rpm",
+            "9e5d7d9b51d905eafea49abcb4b639e95fd33a19b91d2ecad4fb83f2faefce0c",
+        ),
+        "rocminfo": (
+            "rocminfo-1.0.0.60403-128.el8.x86_64.rpm",
+            "ec28a497a48bfc7e5cec75ed4b0ff22c61354916b834aca4e92d700054713a04",
+        ),
+    }
+}
+
+
+def _url(rocm_version, rpm):
+    return "https://repo.radeon.com/rocm/rhel8/{0}/main/{1}".format(rocm_version, rpm)
+
+
+class Hip(Package):
+    """HIP is a C++ Runtime API and Kernel Language that allows developers to
+    create portable applications for AMD and NVIDIA GPUs from single source
+    code.
+
+    This is a *binary* replacement for the builtin `hip` package. The builtin
+    one builds the whole ROCm stack (llvm-amdgpu, comgr, hsa-rocr-dev, the
+    runtime, ...) from source, which takes hours and more disk than a CI runner
+    has. Downstream packages such as vecmem and covfie `depends_on("hip")`
+    literally -- HIP is not a virtual -- so a lightweight package could not be
+    swapped in under a different name; it has to be called `hip`.
+
+    Unlike the builtin package, everything lives in one prefix: the prefix *is*
+    the ROCm root (bin/, include/, lib/, llvm -> lib/llvm, amdgcn -> ...), the
+    layout AMD builds, tests and RPATHs its binaries against. `llvm-amdgpu` and
+    `hsa-rocr-dev` in this repo are thin views into it.
+    """
+
+    homepage = "https://github.com/ROCm/HIP"
+    url = _url("6.4.3", _rpms["6.4.3"]["rocm-core"][0])
+    maintainers("paulgessinger")
+
+    license("MIT")
+
+    # Prebuilt AMD binaries: x86_64 linux only. Their RPATHs only cover the ROCm
+    # tree itself, so the post-install check would flag libnuma/libdrm/libelf,
+    # which they expect the loader to find; the deps below provide them.
+    unresolved_libraries = ["*"]
+    conflicts("platform=darwin", msg="the ROCm binary distribution is linux only")
+    conflicts("target=aarch64:", msg="the ROCm binary distribution is x86_64 only")
+
+    # Kept for compatibility with the builtin package's variants: ROCmPackage
+    # requires `hip +rocm`, and packages that ask for +cuda should get a clear
+    # error rather than a silently AMD-only HIP.
+    variant("rocm", default=True, description="Enable ROCm support")
+    variant("cuda", default=False, description="Build with CUDA")
+    conflicts("+cuda", msg="this binary hip package only provides the AMD (ROCm) platform")
+    conflicts("~rocm", msg="this binary hip package only provides the AMD (ROCm) platform")
+
+    # Shared libraries the ROCm binaries need but do not ship. They are found
+    # via the dependent's RPATH, which Spack's compiler wrapper fills in from
+    # these link dependencies.
+    depends_on("elf", type="link")
+    depends_on("numactl", type="link")
+    depends_on("libdrm", type="link")
+    depends_on("zlib-api", type="link")
+    depends_on("zstd", type="link")
+
+    for _version, _components in _rpms.items():
+        _main = list(_components)[0]
+        version(
+            _version,
+            sha256=_components[_main][1],
+            url=_url(_version, _components[_main][0]),
+            expand=False,
+        )
+        for _component, (_rpm, _sha256) in _components.items():
+            if _component == _main:
+                continue
+            resource(
+                name=_component,
+                url=_url(_version, _rpm),
+                sha256=_sha256,
+                expand=False,
+                destination="rpms",
+                placement=_component,
+                when="@{0}".format(_version),
+            )
+
+    @property
+    def llvm_prefix(self):
+        return self.prefix.llvm
+
+    @property
+    def bitcode_prefix(self):
+        return self.prefix.amdgcn.bitcode
+
+    def install(self, spec, prefix):
+        # The rpms unpack to ./opt/rocm-<version>/... (plus /usr/lib/.build-id
+        # aliases). Unpack inside the prefix so that promoting the ROCm root to
+        # the prefix is a rename rather than a 1.2 GB copy.
+        staging = os.path.join(prefix, ".rpm-staging")
+        rpms = [
+            os.path.join(root, f)
+            for root, _, files in os.walk(self.stage.source_path)
+            for f in sorted(files)
+            if f.endswith(".rpm")
+        ]
+        expected = len(_rpms[str(spec.version)])
+        if len(rpms) != expected:
+            raise InstallError(
+                "expected {0} rpms in the stage, found {1}: {2}".format(expected, len(rpms), rpms)
+            )
+        for rpm in sorted(rpms):
+            tty.info("unpacking {0}".format(os.path.basename(rpm)))
+            extract_rpm(rpm, staging)
+
+        rocm_root = os.path.join(staging, "opt", "rocm-{0}".format(spec.version))
+        if not os.path.isdir(rocm_root):
+            raise InstallError("the rpms did not unpack to {0}".format(rocm_root))
+        for entry in os.listdir(rocm_root):
+            shutil.move(os.path.join(rocm_root, entry), os.path.join(prefix, entry))
+        shutil.rmtree(staging)
+
+        # Sanity check the pieces the environment below points at, so a bad rpm
+        # set fails here rather than halfway through a downstream HIP build.
+        for path in (
+            self.prefix.bin.hipcc,
+            self.prefix.lib.join("libamdhip64.so"),
+            self.llvm_prefix.bin.join("clang++"),
+            self.bitcode_prefix.join("ocml.bc"),
+            self.prefix.lib.cmake.join("hip").join("hip-config.cmake"),
+            self.prefix.lib.cmake.join("hip-lang").join("hip-lang-config.cmake"),
+        ):
+            if not os.path.exists(path):
+                raise InstallError("missing from the installed ROCm tree: {0}".format(path))
+
+    def set_variables(self, env: EnvironmentModifications) -> None:
+        """The environment hipcc, clang and CMake's HIP language look at.
+
+        Mirrors the builtin package, except that every path is inside this one
+        prefix (this is the "external ROCm" case as far as the tools are
+        concerned).
+        """
+        env.set("ROCM_PATH", self.prefix)
+        env.set("HIP_PLATFORM", "amd")
+        env.set("HIP_COMPILER", "clang")
+        # bin directory where clang++ resides; also where CMake looks for the
+        # HIP compiler when CMAKE_HIP_COMPILER is not set explicitly.
+        env.set("HIP_CLANG_PATH", self.llvm_prefix.bin)
+        env.set("HSA_PATH", self.prefix)
+        env.set("ROCMINFO_PATH", self.prefix)
+        # used by hipcc to run `clang --hip-device-lib-path=...`
+        env.set("DEVICE_LIB_PATH", self.bitcode_prefix)
+        # and by clang when --hip-device-lib-path is not passed
+        env.set("HIP_DEVICE_LIB_PATH", self.bitcode_prefix)
+        # used by comgr, and needed by the JIT compiler (hiprtcCreateProgram)
+        env.set("LLVM_PATH", self.llvm_prefix)
+        env.set("COMGR_PATH", self.prefix)
+        env.prepend_path("LD_LIBRARY_PATH", self.prefix.lib)
+        # Dependents pick these up through the RPATH Spack builds from the link
+        # dependencies, but the tools *in this prefix* (rocminfo, and anything
+        # dlopen-ing the runtime) only have the loader path -- and e.g. the
+        # ubuntu 26.04 CI image ships no libnuma at all.
+        for dep in ("elf", "numactl", "libdrm", "zlib-api", "zstd"):
+            env.prepend_path("LD_LIBRARY_PATH", self.spec[dep].prefix.lib)
+
+    def setup_build_environment(self, env: EnvironmentModifications) -> None:
+        self.set_variables(env)
+
+    def setup_run_environment(self, env: EnvironmentModifications) -> None:
+        self.set_variables(env)
+
+    def setup_dependent_build_environment(
+        self, env: EnvironmentModifications, dependent_spec: Spec
+    ) -> None:
+        self.set_variables(env)
+        # CMake's `enable_language(HIP)` otherwise picks the first clang++ on
+        # PATH, which on an image that ships its own clang (or a ccache shim)
+        # is not AMD's; HIPCXX is the env var it consults first.
+        env.set("HIPCXX", self.llvm_prefix.bin.join("clang++"))
+        # --rocm-path keeps clang from going looking in /opt/rocm, and
+        # -isystem <prefix>/include gets it the rocm-core headers.
+        env.set("HIPCC_COMPILE_FLAGS_APPEND", "")
+        env.append_path(
+            "HIPCC_COMPILE_FLAGS_APPEND", "--rocm-path={0}".format(self.prefix), separator=" "
+        )
+        env.append_path(
+            "HIPCC_COMPILE_FLAGS_APPEND",
+            "-isystem {0}".format(self.prefix.include),
+            separator=" ",
+        )
+        env.append_path(
+            "HIPCC_LINK_FLAGS_APPEND", "--rocm-path={0}".format(self.prefix), separator=" "
+        )
+
+        if "amdgpu_target" in dependent_spec.variants:
+            arch = dependent_spec.variants["amdgpu_target"].value
+            # some packages define their own amdgpu_target variant that is not multi
+            if isinstance(arch, str):
+                arch = [arch]
+            if "none" not in arch and "auto" not in arch:
+                env.set("HCC_AMDGPU_TARGET", ",".join(arch))
+
+    def setup_dependent_package(self, module, dependent_spec):
+        self.spec.hipcc = join_path(self.prefix.bin, "hipcc")

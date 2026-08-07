@@ -41,6 +41,13 @@ if [ -z "${CXXSTD:-}" ]; then
     exit 1
 fi
 
+# Accelerator flavor: `host` (default) builds the plain CPU stack and is a no-op
+# below. A non-host value (e.g. `cuda90`, `rocm-gfx90a`) overlays the matching
+# fragments under flavors/ onto the base environment and is appended to
+# TARGET_TRIPLET so all downstream artifacts (lockfile, Dockerfile, image tag,
+# buildcache) are namespaced automatically.
+FLAVOR="${FLAVOR:-host}"
+
 
 # --- TEMPORARY: provide crypt.h for ROOT's net/auth on newer Ubuntu images ---
 # glibc no longer ships <crypt.h>; it now comes from libxcrypt (libcrypt-dev).
@@ -51,8 +58,15 @@ if [ -f /etc/os-release ]; then
     . /etc/os-release
     if [ "${ID:-}" = "ubuntu" ] && [ ! -e /usr/include/crypt.h ]; then
         start_section "Install libcrypt-dev (temporary crypt.h shim)"
-        apt-get update
-        apt-get install -y libcrypt-dev
+        # May run as the host user (local_build.py --user); apt needs root, so
+        # fall back to sudo when we're not already root.
+        if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+            SUDO=sudo
+        else
+            SUDO=""
+        fi
+        ${SUDO} apt-get update
+        ${SUDO} apt-get install -y libcrypt-dev
         end_section
     fi
 fi
@@ -78,6 +92,43 @@ fi
 # across reused build directories — matching CI, which always starts fresh.
 cp "$SCRIPT_DIR"/spack.yaml ./spack.yaml
 # spack -e . mirror set --autopush acts-spack-buildcache
+end_section
+
+start_section "Apply accelerator flavor: $FLAVOR"
+if [ "$FLAVOR" = "host" ]; then
+  echo "host flavor: no overlay applied"
+else
+  flavor_cfg="$SCRIPT_DIR/flavors/${FLAVOR}.yaml"
+  flavor_specs="$SCRIPT_DIR/flavors/${FLAVOR}.specs"
+  if [ ! -f "$flavor_cfg" ] && [ ! -f "$flavor_specs" ]; then
+    echo "ERROR: unknown flavor '$FLAVOR' (no flavors/${FLAVOR}.yaml or .specs)" >&2
+    exit 1
+  fi
+  # Merge the config delta (packages:/concretizer:/... sections) into the env.
+  if [ -f "$flavor_cfg" ]; then
+    echo "Merging config overlay $flavor_cfg"
+    spack -e . config add -f "$flavor_cfg"
+  fi
+  # Add the extra specs, one per line; `#` comments and blank lines are ignored.
+  # A line naming a package that is already a root spec in the base spack.yaml
+  # is merged onto it via `spack change` (which overrides only the attributes
+  # that actually conflict, e.g. flipping a variant, and leaves the rest of the
+  # matched spec — version, other variants — untouched); a line naming a
+  # package with no existing root spec falls back to `spack add` as a new one.
+  if [ -f "$flavor_specs" ]; then
+    while IFS= read -r line; do
+      line="${line%%#*}"
+      line="$(echo "$line" | xargs)"
+      [ -n "$line" ] || continue
+      if spack -e . change "$line" 2>/dev/null; then
+        echo "Merged spec onto existing root spec: $line"
+      else
+        echo "Adding spec: $line"
+        spack -e . add "$line"
+      fi
+    done < "$flavor_specs"
+  fi
+fi
 end_section
 
 start_section "List visible compilers"
@@ -166,4 +217,10 @@ function set_env {
 }
 
 set_env TARGET_ARCH "$(spack arch --family)"
-set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${CXXSTD}"
+# `host` keeps the historical 3-token triplet byte-for-byte; any other flavor
+# adds a fourth token so its artifacts never collide with the CPU stack.
+if [ "$FLAVOR" = "host" ]; then
+  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${CXXSTD}"
+else
+  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${CXXSTD}_${FLAVOR}"
+fi

@@ -1,0 +1,41 @@
+# Extra specs for the `rocm-gfx90a` flavor (one per line; `#` comments allowed).
+# Added via `spack add` on top of the base environment. amdgpu_target=gfx90a
+# comes from flavors/rocm-gfx90a.yaml (applied only to packages that expose it).
+#
+# Upstream Spack's `hip` builds the whole ROCm stack from source, which costs
+# hours and more disk than a CI runner has. spack_repo/acts/packages/ overrides
+# `hip`, `llvm-amdgpu`, `hsa-rocr-dev` and `comgr` with binary packages that
+# unpack AMD's rpms instead (~307 MB download, ~1.2 GB installed). Those names
+# are hardcoded in depends_on upstream (HIP is not a virtual), hence overrides
+# rather than a separate package.
+
+# ROCm HIP toolchain: a complete /opt/rocm-style root (hipcc, clang, device
+# libs, runtime, CMake config packages).
+hip
+
+# traccc GPU stack. vecmem uses its own `+hip` variant; covfie is a
+# ROCmPackage so it's `+rocm` (maps to COVFIE_PLATFORM_HIP) and also pulls in
+# llvm-amdgpu + hsa-rocr-dev.
+vecmem@1.25.0 +hip
+covfie@0.15.6 +rocm
+
+# rocThrust — the HIP-side Thrust traccc resolves via find_package(rocthrust)
+# when TRACCC_BUILD_HIP is on. Pinned to match hip@6.4.3 from rocm-gfx90a.yaml,
+# since rocthrust@X depends_on hip@X exactly. Its closure is what forced the
+# comgr override: rocthrust -> rocprim -> comgr, and the builtin comgr can't
+# build from AMD's rpm layout (wants clang's CMake package where the rpm
+# doesn't ship it); AMD's comgr rpm is already unpacked by `hip`.
+rocthrust@6.4.3
+
+# Alpaka, traccc's portability backend. `backend=hip` not `hip_only`, which
+# would drop the serial backend too.
+alpaka backend=hip
+
+# Deliberately absent, as in cuda13: ACTS vendors/FetchContents traccc,
+# detray and algebra-plugins, so none is a system package. Vc is off on both
+# paths; dfelibs is dead upstream.
+#
+# Worth noting: ACTS itself has no HIP/ROCm build path today (only
+# enable_cuda(), never wiring TRACCC_BUILD_HIP). The HIP backend lives in
+# vendored traccc but nothing in ACTS turns it on — this flavor currently
+# supports a standalone traccc/detray HIP build, not an ACTS one.
