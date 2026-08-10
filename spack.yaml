@@ -1,7 +1,7 @@
 spack:
   specs:
     - boost@1.90.0 +program_options +test +json +graph +filesystem
-    - cmake@4.4.2
+    - cmake@4.3.3
     - ccache@4.12
     - edm4hep@1.1
     - eigen@5.0.1
