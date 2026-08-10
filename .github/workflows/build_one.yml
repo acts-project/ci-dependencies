@@ -296,6 +296,19 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}_${{ env.TARGET_TRIPLET_SLUG }}
             type=semver,pattern={{major}}_${{ env.TARGET_TRIPLET_SLUG }}
 
+      - name: Set up Docker Buildx
+        if: "inputs.image != '' && !cancelled()"
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          # Our generated Dockerfiles have many parallel FROM stages that
+          # share large common base layers (e.g. CUDA flavors). Fetching the
+          # same layer concurrently from multiple stages can trip a BuildKit
+          # content-store race ("failed commit on ref ... no such file or
+          # directory"). Capping worker parallelism avoids the race.
+          buildkitd-config-inline: |
+            [worker.oci]
+              max-parallelism = 4
+
       - name: Build and push
         if: "inputs.image != '' && !cancelled()"
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
