@@ -29,50 +29,50 @@ from spack.package import *
 # and rocprofiler-register, which covers every find_dependency() that
 # hip-config.cmake and hip-lang-config.cmake issue.
 _rpms = {
-    "6.4.3": {
+    "7.2.3": {
         "rocm-core": (
-            "rocm-core-6.4.3.60403-128.el8.x86_64.rpm",
-            "bdf3b988c8dfdc066efccca3c8e698613813c4d7bd037660105ca903a18503db",
+            "rocm-core-7.2.3.70203-90.el8.x86_64.rpm",
+            "ce7297f96b610b56c203e1e77a11a6d5a66070bea2fb489ceb1b632cdcb894b3",
         ),
         "rocm-llvm": (
-            "rocm-llvm-19.0.0.25224.60403-128.el8.x86_64.rpm",
-            "4e52eeb81136f62d42bdc12dee6a22bf7b13e05f2330295bae93c131629e3b13",
+            "rocm-llvm-22.0.0.26084.70203-90.el8.x86_64.rpm",
+            "88d896ccc5abc96aa253280d4a6a14744672bc4f940a7187f535f6da63b588ad",
         ),
         "rocm-device-libs": (
-            "rocm-device-libs-1.0.0.60403-128.el8.x86_64.rpm",
-            "24138877252d5c2c3928c11f6e6a6272a349bec1cb99e57425680470e6941a26",
+            "rocm-device-libs-1.0.0.70203-90.el8.x86_64.rpm",
+            "5552e039c5b2ba1d453bfd63b563d0b53a2539bc8ce356292c29d69bc8681e5f",
         ),
         "hsa-rocr": (
-            "hsa-rocr-1.15.0.60403-128.el8.x86_64.rpm",
-            "6458b700adc4ff7a52d2528cce6352c1a1dc4403330f8d113681a7f06caa3d11",
+            "hsa-rocr-1.18.0.70203-90.el8.x86_64.rpm",
+            "4332bcc5d7e327a274cf7abce4b7836860a90dfa78a6476aa917e2275d8fa240",
         ),
         "hsa-rocr-devel": (
-            "hsa-rocr-devel-1.15.0.60403-128.el8.x86_64.rpm",
-            "2ef7e03b961f80d2fe0990ddc48f5d84c7737886fb3bcac161ebbd29f87c1a47",
+            "hsa-rocr-devel-1.18.0.70203-90.el8.x86_64.rpm",
+            "eb520e8a12712c86b854183950b3fc56da4e480a8b505a72bc8649b59b2f20ca",
         ),
         "comgr": (
-            "comgr-3.0.0.60403-128.el8.x86_64.rpm",
-            "43a74f024cf811d4a8b662a4973cc5933d85e132f0913274bfc4bcc57b6758fa",
+            "comgr-3.0.0.70203-90.el8.x86_64.rpm",
+            "5631e6ec1b02825421422067a0d89a6aba2a8893fe8f851fea73dfa2d08e0136",
         ),
         "hip-runtime-amd": (
-            "hip-runtime-amd-6.4.43484.60403-128.el8.x86_64.rpm",
-            "980f020c68bab9b730d8e36f64efbc73c751f3d5d83c931432c9268db86b98fb",
+            "hip-runtime-amd-7.2.53211.70203-90.el8.x86_64.rpm",
+            "51dde52277676e6536e68a718f3d27f37bc7edecbaddfc1da5f135ba3e99e487",
         ),
         "hip-devel": (
-            "hip-devel-6.4.43484.60403-128.el8.x86_64.rpm",
-            "0de48fafca935a778da65750f5945dd056a70a235136231218fffda2362cf3e4",
+            "hip-devel-7.2.53211.70203-90.el8.x86_64.rpm",
+            "be362c0667e052d5979a3ade7a4e7d883ee3648918a93375a77d06f9f23dd588",
         ),
         "hipcc": (
-            "hipcc-1.1.1.60403-128.el8.x86_64.rpm",
-            "ee894d158c289a6c770a4d33d4e8de37e15aab3b8bfd505fb1a0f2fbbb90a9ef",
+            "hipcc-1.1.1.70203-90.el8.x86_64.rpm",
+            "39a213ae99e9dfcf88f48b7ba38f26214b5e195d50ac93bde69ce37a24319112",
         ),
         "rocprofiler-register": (
-            "rocprofiler-register-0.4.0.60403-128.el8.x86_64.rpm",
-            "9e5d7d9b51d905eafea49abcb4b639e95fd33a19b91d2ecad4fb83f2faefce0c",
+            "rocprofiler-register-0.6.0.70203-90.el8.x86_64.rpm",
+            "2aa885c67e42ae7eafa14e462415c3fb031b2f6434356fd8223031cfafa28e21",
         ),
         "rocminfo": (
-            "rocminfo-1.0.0.60403-128.el8.x86_64.rpm",
-            "ec28a497a48bfc7e5cec75ed4b0ff22c61354916b834aca4e92d700054713a04",
+            "rocminfo-1.0.0.70203-90.el8.x86_64.rpm",
+            "8e2aaf1940e4589b14398d164bb79907bfaaf075467498a1e630e0fa4a0ad48f",
         ),
     }
 }
@@ -101,7 +101,7 @@ class Hip(Package):
     """
 
     homepage = "https://github.com/ROCm/HIP"
-    url = _url("6.4.3", _rpms["6.4.3"]["rocm-core"][0])
+    url = _url("7.2.3", _rpms["7.2.3"]["rocm-core"][0])
     maintainers("paulgessinger")
 
     license("MIT")
@@ -162,7 +162,7 @@ class Hip(Package):
     def install(self, spec, prefix):
         # The rpms unpack to ./opt/rocm-<version>/... (plus /usr/lib/.build-id
         # aliases). Unpack inside the prefix so that promoting the ROCm root to
-        # the prefix is a rename rather than a 1.2 GB copy.
+        # the prefix is a rename rather than a 2 GB copy.
         staging = os.path.join(prefix, ".rpm-staging")
         rpms = [
             os.path.join(root, f)

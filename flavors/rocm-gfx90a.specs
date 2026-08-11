@@ -5,7 +5,7 @@
 # Upstream Spack's `hip` builds the whole ROCm stack from source, which costs
 # hours and more disk than a CI runner has. spack_repo/acts/packages/ overrides
 # `hip`, `llvm-amdgpu`, `hsa-rocr-dev` and `comgr` with binary packages that
-# unpack AMD's rpms instead (~307 MB download, ~1.2 GB installed). Those names
+# unpack AMD's rpms instead (~456 MB download, ~2.1 GB installed). Those names
 # are hardcoded in depends_on upstream (HIP is not a virtual), hence overrides
 # rather than a separate package.
 
@@ -20,12 +20,15 @@ vecmem@1.25.0 +hip
 covfie@0.15.6 +rocm
 
 # rocThrust — the HIP-side Thrust traccc resolves via find_package(rocthrust)
-# when TRACCC_BUILD_HIP is on. Pinned to match hip@6.4.3 from rocm-gfx90a.yaml,
-# since rocthrust@X depends_on hip@X exactly. Its closure is what forced the
+# when TRACCC_BUILD_HIP is on. Pinned to match hip@7.2.3 from rocm-gfx90a.yaml,
+# since rocthrust@X depends_on hip@X exactly — which is what picks the ROCm
+# patch release for the whole flavor: AMD ships rhel8 rpms for 7.2 through
+# 7.2.4, but upstream Spack only has rocthrust 7.2.0/7.2.1/7.2.3, so 7.2.3 is
+# the newest 7.2.x the two agree on. Its closure is what forced the
 # comgr override: rocthrust -> rocprim -> comgr, and the builtin comgr can't
 # build from AMD's rpm layout (wants clang's CMake package where the rpm
 # doesn't ship it); AMD's comgr rpm is already unpacked by `hip`.
-rocthrust@6.4.3
+rocthrust@7.2.3
 
 # Alpaka, traccc's portability backend. `backend=hip` not `hip_only`, which
 # would drop the serial backend too.

@@ -27,9 +27,9 @@ class HsaRocrDev(Package):
     # All content comes from `hip`; there is nothing to fetch here.
     has_code = False
 
-    version("6.4.3")
+    version("7.2.3")
 
-    depends_on("hip@6.4.3", when="@6.4.3")
+    depends_on("hip@7.2.3", when="@7.2.3")
 
     # Accepted for compatibility with packages that spell out the builtin
     # package's variants; AMD ships libhsa-runtime64 as a shared library.
@@ -39,6 +39,9 @@ class HsaRocrDev(Package):
     # Exactly what AMD's hsa-rocr and hsa-rocr-devel rpms drop into the ROCm
     # root. These paths also exist in `hip`'s prefix, but a view resolves both
     # sides to the same file and keeps one entry, so the overlap is harmless.
+    # `symlink_tree` raises on an entry that matches nothing, so this list has
+    # to track AMD's layout exactly: the doc directory was `hsa-runtime64`
+    # through 6.4.x and is `hsa-rocr` (the rpm name) from 7.x on.
     _contents = [
         "include/hsa",
         "include/hsakmt",
@@ -47,7 +50,7 @@ class HsaRocrDev(Package):
         "lib/cmake/hsa-runtime64",
         "lib/cmake/hsakmt",
         "lib/pkgconfig/libhsakmt.pc",
-        "share/doc/hsa-runtime64",
+        "share/doc/hsa-rocr",
     ]
 
     def install(self, spec, prefix):
