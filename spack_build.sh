@@ -162,7 +162,26 @@ end_section
 start_section "Select compiler and cxxstd"
 spack -e . compiler list
 echo "Looking for compiler: $COMPILER"
-spack -e . compiler list | grep "$COMPILER"
+if [ -n "${COMPILER_MATCH_MAJOR:-}" ]; then
+  # Opt-in for host builds, where the exact patch version pinned in the matrix
+  # is unlikely to be what's actually installed: fall back to any compiler of
+  # the same name and major version, and rewrite $COMPILER to the one found so
+  # everything below (the require: entries, TARGET_TRIPLET) uses a real,
+  # concretely-installed spec rather than the unmatched exact one.
+  compiler_name="${COMPILER%@*}"
+  compiler_major="${COMPILER#*@}"
+  compiler_major="${compiler_major%%.*}"
+  echo "COMPILER_MATCH_MAJOR set: matching ${compiler_name}@${compiler_major}.* instead of exact $COMPILER"
+  resolved="$(spack -e . compiler list | grep -oE "${compiler_name}@${compiler_major}(\.[0-9]+)*\b" | head -1)"
+  if [ -z "$resolved" ]; then
+    echo "ERROR: no ${compiler_name}@${compiler_major}.x compiler found" >&2
+    exit 1
+  fi
+  echo "Resolved $COMPILER -> $resolved"
+  COMPILER="$resolved"
+else
+  spack -e . compiler list | grep "$COMPILER"
+fi
 # Require the compiler as the provider of the C/C++ language virtuals rather than
 # as a blanket `%compiler` dependency on `packages:all` (which spack warns is
 # really a provider requirement). Fortran is left unconstrained on purpose: the
@@ -178,31 +197,35 @@ spack -e . concretize -Uf
 spack -e . find -c
 end_section
 
-echo "+ Spack build"
-args="--no-check-signature --show-log-on-error --concurrent-packages 8"
-if [ -n "${FAIL_FAST:-}" ]; then
-  args="$args --fail-fast"
-fi
-if [ -n "${BUILD_JOBS:-}" ]; then
-  args="$args -j $BUILD_JOBS"
-fi
-spack -e . install $args
-
-start_section "Verify ROOT C++ standard"
-root_config="$(spack -e . location -i root)/bin/root-config"
-root_cflags=$("$root_config" --cflags)
-echo "root-config --cflags: $root_cflags"
-if [[ "$root_cflags" =~ c[+][+]([0-9a-z]+) ]]; then
-  root_cxxstd="${BASH_REMATCH[1]}"
+if [ -n "${SKIP_INSTALL:-}" ]; then
+  echo "+ SKIP_INSTALL set: environment created and concretized; skipping 'spack install'."
 else
-  root_cxxstd=""
+  echo "+ Spack build"
+  args="--no-check-signature --show-log-on-error --concurrent-packages 8"
+  if [ -n "${FAIL_FAST:-}" ]; then
+    args="$args --fail-fast"
+  fi
+  if [ -n "${BUILD_JOBS:-}" ]; then
+    args="$args -j $BUILD_JOBS"
+  fi
+  spack -e . install $args
+
+  start_section "Verify ROOT C++ standard"
+  root_config="$(spack -e . location -i root)/bin/root-config"
+  root_cflags=$("$root_config" --cflags)
+  echo "root-config --cflags: $root_cflags"
+  if [[ "$root_cflags" =~ c[+][+]([0-9a-z]+) ]]; then
+    root_cxxstd="${BASH_REMATCH[1]}"
+  else
+    root_cxxstd=""
+  fi
+  echo "ROOT C++ standard: '${root_cxxstd}' (expected '$CXXSTD')"
+  if [ "$root_cxxstd" != "$CXXSTD" ]; then
+    echo "ERROR: ROOT reports C++ standard '$root_cxxstd' but '$CXXSTD' was requested"
+    exit 1
+  fi
+  end_section
 fi
-echo "ROOT C++ standard: '${root_cxxstd}' (expected '$CXXSTD')"
-if [ "$root_cxxstd" != "$CXXSTD" ]; then
-  echo "ERROR: ROOT reports C++ standard '$root_cxxstd' but '$CXXSTD' was requested"
-  exit 1
-fi
-end_section
 
 function set_env {
   key="$1"
