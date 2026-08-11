@@ -41,6 +41,8 @@ spack:
       # perf counters only supported on linux
     - benchmark@1.9.5
     - arrow@24.0.0 +bz2 +parquet +zlib +zstd +dataset +filesystem +compute +snappy +brotli +python
+
+    - actsvg@0.4.56
   packages:
     all:
       target:
