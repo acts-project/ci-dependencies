@@ -30,6 +30,22 @@ covfie@0.15.6 +rocm
 # doesn't ship it); AMD's comgr rpm is already unpacked by `hip`.
 rocthrust@7.2.3
 
+# rocRAND. Same exact `depends_on("hip@X")` pin as rocthrust, so it moves with
+# the flavor's ROCm version and constrains which patch release is reachable in
+# the same way (builtin has 7.2.0/7.2.1/7.2.3 here too).
+#
+# This is the one spec in the flavor that needs a Fortran compiler: builtin
+# rocrand carries an unconditional `depends_on("fortran", type="build")` from
+# Spack's generated language dependencies. It is build-only and satisfied by
+# the base image's gfortran (the ubuntu2604 image ships gfortran-15 alongside
+# gcc@15.2.0), so it resolves to the same external gcc rather than building one
+# — but it does mean this flavor now requires an image with Fortran.
+#
+# rocRAND only, not hipRAND: they are separate packages upstream, so a consumer
+# that resolves `find_package(hiprand)` rather than `find_package(rocrand)`
+# needs `hiprand` added here as well.
+rocrand@7.2.3
+
 # Alpaka, traccc's portability backend. `backend=hip` not `hip_only`, which
 # would drop the serial backend too.
 alpaka backend=hip
