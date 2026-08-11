@@ -56,6 +56,33 @@ CONTAINER_LABEL = "io.acts-project.local-build"
 # only — never with a value — so the token never appears in printed commands.
 PUSH_CRED_VARS = ("GH_OCI_USER", "GH_OCI_TOKEN")
 
+# Host builds run as a plain subprocess of this script and so, unlike Docker
+# (which starts from a clean container environment), inherit its entire shell
+# environment by default. A LD_LIBRARY_PATH/ROOTSYS/PYTHONPATH left over from
+# e.g. a CVMFS/LCG `setupATLAS`-style environment sourced earlier in that shell
+# points at a *different* ROOT/Python install; ROOT runs itself mid-build (to
+# generate tutorials/hsimple.root) and picks it up, loading two copies of its
+# own libraries into one process — duplicate class registration, then heap
+# corruption ("malloc_consolidate(): unaligned fastbin chunk detected"). Strip
+# these before the build ever starts so it only ever sees the store it built.
+HOST_BUILD_LEAK_PRONE_VARS = (
+    "LD_LIBRARY_PATH",
+    "LD_PRELOAD",
+    "DYLD_LIBRARY_PATH",
+    "DYLD_INSERT_LIBRARIES",
+    "ROOTSYS",
+    "PYTHONHOME",
+    "PYTHONPATH",
+    "CMAKE_PREFIX_PATH",
+    "PKG_CONFIG_PATH",
+    "CPATH",
+    "C_INCLUDE_PATH",
+    "CPLUS_INCLUDE_PATH",
+    "LIBRARY_PATH",
+    "ACLOCAL_PATH",
+    "SPACK_ENV",
+)
+
 
 # ---------------------------------------------------------------------------
 # Matrix parsing
@@ -274,6 +301,29 @@ def setup_ci_spack(ref: str, refresh: bool) -> str:
     rev = _git(["rev-parse", "--short", "HEAD"], cwd=repo, quiet=True).stdout.strip()
     console.print(f"[dim]spack ready at {repo} → {rev}[/dim]")
     return str(repo)
+
+
+def check_spack_root_writable(spack_root: str) -> None:
+    """Fail early with an actionable message instead of Spack's cryptic 'cannot
+    create lock ... not writable' when the store is owned by another user — e.g.
+    a stale root-owned opt/spack/ left behind by a Docker build that ran as root
+    (--no-user, or predating the --user default) against the same --ci-spack
+    clone that `host` now writes to directly as the plain host user.
+    """
+    opt = Path(spack_root) / "opt"
+    if not opt.exists() or os.access(opt, os.W_OK | os.X_OK):
+        return
+    try:
+        owner = opt.owner()
+    except (KeyError, OSError):
+        owner = "another user"
+    console.print(
+        f"[red]Error:[/red] {opt} is owned by [bold]{owner}[/bold] and isn't "
+        "writable by you — likely left behind by a Docker build that ran as "
+        "root. Fix once with:\n"
+        f"  [bold]sudo chown -R $(id -u):$(id -g) {spack_root}[/bold]"
+    )
+    raise typer.Exit(1)
 
 
 def resolve_spack_root(
@@ -636,6 +686,8 @@ def execute_host_build(
     dry_run: bool,
     shell: bool,
     jobs: int | None = None,
+    compiler_major_only: bool = False,
+    install: bool = True,
     index: int | None = None,
 ) -> None:
     """Run spack_build.sh directly on the host, installing into `env_dir`.
@@ -650,14 +702,26 @@ def execute_host_build(
     if warning:
         console.print(f"[yellow]Warning:[/yellow] {warning}")
 
-    action = "Shell" if shell else "Host build"
+    action = "Shell" if shell else ("Host build" if install else "Host env setup")
     console.print(f"\n[bold]{action}:[/bold] {describe_entry(entry, index)}")
     console.print(f"[bold]Env dir:[/bold] [dim]{env_dir}[/dim]")
+    if compiler_major_only:
+        console.print(
+            f"[dim]Matching compiler by major version only ({entry['compiler'].split('@')[0]}"
+            f"@{entry['compiler'].split('@', 1)[1].split('.')[0]}.*), not the exact pinned version.[/dim]"
+        )
 
     if shell:
         require_built_env(env_dir, dry_run)
 
     env = os.environ.copy()
+    leaked = [v for v in HOST_BUILD_LEAK_PRONE_VARS if env.pop(v, None) is not None]
+    if leaked:
+        console.print(
+            f"[yellow]Stripped from the build environment:[/yellow] {', '.join(leaked)} "
+            "(inherited from your shell — e.g. a CVMFS/LCG setup — and can collide "
+            "with the freshly built stack)."
+        )
     env["SPACK_ROOT"] = spack_root
     env["COMPILER"] = entry["compiler"]
     env["COMPILER_PATH"] = entry.get("compiler_path", "")
@@ -665,6 +729,10 @@ def execute_host_build(
     env["FLAVOR"] = entry_flavor(entry)
     if jobs is not None:
         env["BUILD_JOBS"] = str(jobs)
+    if compiler_major_only:
+        env["COMPILER_MATCH_MAJOR"] = "1"
+    if not install:
+        env["SKIP_INSTALL"] = "1"
 
     if shell:
         cmd = [
@@ -683,24 +751,43 @@ def execute_host_build(
         console.print("\n[yellow]Dry run — not executing.[/yellow]")
         return
 
+    check_spack_root_writable(spack_root)
+
     env_dir.mkdir(parents=True, exist_ok=True)
     console.print(f"\n[bold green]Starting:[/bold green] {describe_entry(entry, index)}\n")
     result = subprocess.run(cmd, cwd=env_dir, env=env)
     if result.returncode != 0:
+        if shell:
+            failed = "Shell exited with an error"
+        elif install:
+            failed = "Build failed"
+        else:
+            failed = "Env setup failed"
         console.print(
-            f"\n[bold red]{'Shell exited with an error' if shell else 'Build failed'}"
-            f"[/bold red] (exit code [bold]{result.returncode}[/bold])"
+            f"\n[bold red]{failed}[/bold red] (exit code [bold]{result.returncode}[/bold])"
         )
         console.print(f"  build:   {describe_entry(entry, index)}")
         console.print(f"  env dir: [dim]{env_dir}[/dim]")
         raise typer.Exit(result.returncode)
 
-    if not shell:
+    if shell:
+        pass
+    elif install:
         console.print(f"\n[bold green]Build succeeded:[/bold green] {describe_entry(entry, index)}")
         console.print(
             f"  Installed into [dim]{env_dir}[/dim] — it persists, so re-running this "
             "build reuses and updates it. Activate it later with:\n"
             f"  [bold]spack env activate -d {env_dir}[/bold]"
+        )
+    else:
+        console.print(
+            f"\n[bold green]Env ready:[/bold green] {describe_entry(entry, index)} "
+            "(created/concretized, not installed)"
+        )
+        console.print(
+            f"  Persisted at [dim]{env_dir}[/dim]. Install it with:\n"
+            f"  [bold]spack -e {env_dir} install[/bold]\n"
+            "  or re-run this same selection without --no-install."
         )
 
 
@@ -1123,6 +1210,15 @@ def host_build(
             "requires a prior successful build in that env dir.",
         ),
     ] = False,
+    install: Annotated[
+        bool,
+        typer.Option(
+            "--install/--no-install",
+            help="Also run 'spack install' after concretizing (default). --no-install "
+            "just creates/updates and concretizes the persistent env, so you can "
+            "inspect it or install it yourself later.",
+        ),
+    ] = True,
     run_all: Annotated[
         bool,
         typer.Option(
@@ -1139,6 +1235,16 @@ def host_build(
             help="Total build parallelism (spack 'config:build_jobs'); default is spack's own min(16, ncpu).",
         ),
     ] = (os.cpu_count() or 1),
+    compiler_major_only: Annotated[
+        bool,
+        typer.Option(
+            "--compiler-major-only",
+            help="Match the matrix compiler by name + major version only (e.g. gcc@15) "
+            "instead of the exact pinned patch version. Opt-in because it builds "
+            "against whatever patch version this host actually has, which CI doesn't "
+            "guarantee is the same one.",
+        ),
+    ] = False,
 ):
     """Build a config directly on this host, no Docker — installs into a
     persistent spack env under .local_build/host-envs/ so it sticks around for
@@ -1177,6 +1283,8 @@ def host_build(
                     dry_run,
                     shell,
                     jobs,
+                    compiler_major_only,
+                    install,
                     index=i,
                 )
             except typer.Exit:
@@ -1194,7 +1302,15 @@ def host_build(
 
     sr = resolve_spack_root(spack_root, ci_spack, spack_ref, refresh_spack, dry_run)
     execute_host_build(
-        entries[idx], sr, host_env_dir_for(entries[idx], env_dir), dry_run, shell, jobs, index=idx
+        entries[idx],
+        sr,
+        host_env_dir_for(entries[idx], env_dir),
+        dry_run,
+        shell,
+        jobs,
+        compiler_major_only,
+        install,
+        index=idx,
     )
 
 
