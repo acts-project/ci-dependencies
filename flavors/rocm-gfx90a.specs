@@ -41,10 +41,22 @@ rocthrust@7.2.3
 # gcc@15.2.0), so it resolves to the same external gcc rather than building one
 # — but it does mean this flavor now requires an image with Fortran.
 #
-# rocRAND only, not hipRAND: they are separate packages upstream, so a consumer
-# that resolves `find_package(hiprand)` rather than `find_package(rocrand)`
-# needs `hiprand` added here as well.
 rocrand@7.2.3
+
+# hipRAND, the portable wrapper consumers reach through find_package(hiprand).
+# A separate package from rocrand upstream, so both are needed: this one only
+# supplies the hipRAND interface and delegates to a backend.
+#
+# `+rocm` is explicit even though it is the default: hiprand is both a
+# CudaPackage and a ROCmPackage, exactly one of +cuda/+rocm is required, and
+# spelling it out keeps this readable next to covfie above. It pulls
+# rocrand@7.2.3 (same exact-version pin) and forwards amdgpu_target to it, so
+# the two stay consistent with the flavor's gfx target on their own.
+#
+# Note the source is large for what it is: from 7.1.1 on, url_for_version
+# switches from the per-project hipRAND tarball to the whole ROCm/rocm-libraries
+# monorepo, and the package builds one subdirectory out of it.
+hiprand@7.2.3 +rocm
 
 # Alpaka, traccc's portability backend. `backend=hip` not `hip_only`, which
 # would drop the serial backend too.
