@@ -41,6 +41,25 @@ if [ -z "${CXXSTD:-}" ]; then
     exit 1
 fi
 
+# Consume CXXSTD into a shell variable and drop it from the environment. Spack
+# passes the ambient environment through to every package build, and `CXXSTD` is
+# a name build systems use: nccl's makefiles/common.mk does
+# `CXXSTD ?= -std=c++17` and then puts $(CXXSTD) straight into CXXFLAGS and
+# NVCUFLAGS. Make treats an environment variable as already set, so `?=` never
+# applies the default, our `CXXSTD=23` wins, and the compile line gets a bare
+# `23`: `g++: error: 23: linker input file not found`.
+#
+# Nothing below needs it in the environment — it is only read to build the
+# `packages:all:require` entry, cross-check ROOT, and name TARGET_TRIPLET — so
+# unsetting it here (rather than around `spack install`) keeps it out of every
+# child process. `set -u` is on, so a missed reference below fails loudly
+# instead of quietly requesting an empty standard.
+#
+# COMPILER and FLAVOR are the same shape of hazard, but both are still needed in
+# the environment further down, and no package has been seen to read them.
+cxxstd="$CXXSTD"
+unset CXXSTD
+
 # Accelerator flavor: `host` (default) builds the plain CPU stack and is a no-op
 # below. A non-host value (e.g. `cuda90`, `rocm-gfx90a`) overlays the matching
 # fragments under flavors/ onto the base environment and is appended to
@@ -187,7 +206,7 @@ fi
 # really a provider requirement). Fortran is left unconstrained on purpose: the
 # llvm/apple-clang matrix entries don't provide fortran, so it resolves freely
 # (typically to gcc), matching the previous behavior.
-spack -e . config add "packages:all:require:[\"cxxstd=$CXXSTD\"]"
+spack -e . config add "packages:all:require:[\"cxxstd=$cxxstd\"]"
 spack -e . config add "packages:c:require:[\"$COMPILER\"]"
 spack -e . config add "packages:cxx:require:[\"$COMPILER\"]"
 end_section
@@ -219,9 +238,9 @@ else
   else
     root_cxxstd=""
   fi
-  echo "ROOT C++ standard: '${root_cxxstd}' (expected '$CXXSTD')"
-  if [ "$root_cxxstd" != "$CXXSTD" ]; then
-    echo "ERROR: ROOT reports C++ standard '$root_cxxstd' but '$CXXSTD' was requested"
+  echo "ROOT C++ standard: '${root_cxxstd}' (expected '$cxxstd')"
+  if [ "$root_cxxstd" != "$cxxstd" ]; then
+    echo "ERROR: ROOT reports C++ standard '$root_cxxstd' but '$cxxstd' was requested"
     exit 1
   fi
   end_section
@@ -243,7 +262,7 @@ set_env TARGET_ARCH "$(spack arch --family)"
 # `host` keeps the historical 3-token triplet byte-for-byte; any other flavor
 # adds a fourth token so its artifacts never collide with the CPU stack.
 if [ "$FLAVOR" = "host" ]; then
-  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${CXXSTD}"
+  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${cxxstd}"
 else
-  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${CXXSTD}_${FLAVOR}"
+  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${cxxstd}_${FLAVOR}"
 fi
