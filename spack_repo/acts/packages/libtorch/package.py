@@ -123,21 +123,26 @@ class Libtorch(Package):
     unresolved_libraries = ["*"]
 
     with when("+cuda"):
-        # What libtorch_cuda.so needs from outside its own prefix. The zip is
-        # named "shared-with-deps" but the deps it bundles are torch's own
-        # (including libtorch_nvshmem.so); everything CUDA is external:
+        # What the CUDA build needs from outside its own prefix. The zip is named
+        # "shared-with-deps" but the deps it bundles are torch's own; everything
+        # NVIDIA is external:
         #
-        #   cudart, cublas, cublasLt, cusparse, cufft, cufile, curand, nvrtc
-        #                                                     -> the toolkit
-        #   cudnn 9, nccl 2, cusparseLt 0                     -> the three below
+        #   cudart, cublas, cublasLt, cusparse, cufft, cufile, curand, nvrtc,
+        #   cupti                                             -> the toolkit
+        #   cudnn 9, cusparseLt 0, nccl 2, nvshmem_host 3     -> the four below
+        #
+        # The zip does contain libtorch_nvshmem.so, but that is torch's own thin
+        # wrapper, not NVIDIA's runtime — it carries its own DT_NEEDED on
+        # libnvshmem_host.so.3, and libtorch_cuda.so pulls the wrapper in, so the
+        # runtime has to be here whether or not anything calls it.
         #
         # The floors are the versions PyTorch links against, read off the
         # matching wheel's Requires-Dist (nvidia-cudnn-cu13 9.20.0.48,
-        # nvidia-nccl-cu13 2.29.7, nvidia-cusparselt-cu13 0.8.1); the sonames
-        # (.so.9, .so.2, .so.0) make anything newer in the same major fine.
-        # cudnn and cusparselt encode the CUDA major as a `-13` version suffix
-        # that ties them back to `cuda` on its own, so no constraint here has to
-        # repeat it.
+        # nvidia-cusparselt-cu13 0.8.1, nvidia-nccl-cu13 2.29.7,
+        # nvidia-nvshmem-cu13 3.4.5); the sonames (.so.9, .so.0, .so.2, .so.3)
+        # make anything newer in the same major fine. cudnn and cusparselt encode
+        # the CUDA major as a `-13` version suffix that ties them back to `cuda`
+        # on its own, so no constraint here has to repeat it.
         depends_on("cuda@13.2:13", type=("build", "link", "run"))
         depends_on("cudnn@9.20:9", type=("build", "link", "run"))
         depends_on("cusparselt@0.8.1:", type=("build", "link", "run"))
@@ -151,8 +156,19 @@ class Libtorch(Package):
         #
         # nccl is a CudaPackage and conflicts with `cuda_arch=none`, so anything
         # depending on this needs a cuda_arch from somewhere; in CI that is
-        # flavors/cuda13.yaml's blanket `variants: [cuda_arch=75]`.
+        # flavors/cuda13.yaml's blanket `variants: [cuda_arch=75]`. The same goes
+        # for nvshmem below.
         depends_on("nccl@2.29: fabrics=auto", type=("build", "link", "run"))
+
+        # nvshmem, trimmed for the same reason as nccl: all this stack wants is
+        # libnvshmem_host.so.3 for the DT_NEEDED chain, and its transports are
+        # dead weight in a build that never runs a collective. `~mpi` is the one
+        # that matters — the default would put an entire MPI implementation in
+        # the image. `+gdrcopy` is not a choice: upstream conflicts `~gdrcopy`
+        # with `~ucx`, so one of the two has to stay, and gdrcopy is much the
+        # smaller. Unlike nccl this is not in every CUDA stack, so the floor is
+        # pinned exactly to what PyTorch links against.
+        depends_on("nvshmem@3.4.5: ~mpi ~ucx ~nccl ~shmem +gdrcopy", type=("build", "link", "run"))
 
     for _version, _dist in _DISTS.items():
         # A version fetches one file under one checksum, and every artifact
@@ -213,6 +229,46 @@ class Libtorch(Package):
         r"(?P<var>CUDA_(?:COMMON|ALL)_GPU_ARCHITECTURES)\s+"
         r'"(?P<major>\d+)\.(?P<minor>\d+)(?P<suffix>[a-z]*(?:\+PTX)?)"'
     )
+
+    # Libraries the CUDA build has a DT_NEEDED on and expects to find beside
+    # itself, because pip ships them in sibling nvidia/* wheels — which is what
+    # torch's `$ORIGIN/../../nvidia/*/lib` RPATH entries point at. Neither is
+    # reachable from a spack install: CUPTI is in the toolkit but buried under
+    # extras/, which is on no library path, and NVIDIA's nvshmem runtime is not
+    # in the zip at all.
+    #
+    # {soname: the spec that provides it}. Symlinked into our own lib/, which is
+    # both what `$ORIGIN` resolves to at run time and what a consumer reaches
+    # through -rpath-link (a view merges it into <view>/lib) at link time. Left
+    # out, anything linking libtorch into an *executable* fails on `undefined
+    # reference to cuptiSubscribe@libcupti.so.13` / `nvshmem_malloc@NVSHMEM`: ld
+    # allows unresolved DT_NEEDED when producing a shared library but not an
+    # executable, so the plugin builds and only the test binaries break.
+    _SIBLING_LIBS = {"libcupti.so.13": "cuda", "libnvshmem_host.so.3": "nvshmem"}
+
+    def _link_sibling_libraries(self, spec, prefix):
+        """Symlink the pip-layout siblings into lib/ (see _SIBLING_LIBS)."""
+        for soname, provider in sorted(self._SIBLING_LIBS.items()):
+            root = spec[provider].prefix
+            found = [
+                os.path.join(parent, soname)
+                for parent, _, files in os.walk(root)
+                if soname in files
+            ]
+            if not found:
+                raise InstallError(
+                    "{0} provides no {1}; libtorch_cuda's DT_NEEDED chain needs it "
+                    "and nothing in this prefix supplies it".format(spec[provider], soname)
+                )
+            if len(found) > 1:
+                # An exact soname match, so the toolkit's differently-versioned
+                # copies (nsight ships libcupti.so.13.3) do not land here. If two
+                # ever do, pick deliberately rather than by walk order.
+                raise InstallError(
+                    "{0} provides {1} more than once: {2}".format(spec[provider], soname, found)
+                )
+            os.symlink(found[0], prefix.lib.join(soname))
+            tty.info("linked {0} -> {1}".format(soname, found[0]))
 
     def _prune_dead_cuda_archs(self, spec, prefix):
         """Drop architectures the paired CUDA toolkit cannot target.
@@ -339,10 +395,12 @@ class Libtorch(Package):
         ]
         if spec.satisfies("+cuda"):
             expected += [prefix.lib.join("libtorch_cuda.so"), prefix.lib.join("libc10_cuda.so")]
-            # Only for +cuda: the CPU builds ship the same table, but their
-            # Caffe2Config never includes public/cuda.cmake, so nothing reads it
-            # — and there is no toolkit in the spec to ask what it supports.
+            # Both only for +cuda: the CPU builds ship the same arch table, but
+            # their Caffe2Config never includes public/cuda.cmake so nothing
+            # reads it, they have no DT_NEEDED on either sibling library, and
+            # there is no toolkit in the spec to ask about either one.
             self._prune_dead_cuda_archs(spec, prefix)
+            self._link_sibling_libraries(spec, prefix)
         for path in expected:
             if not os.path.exists(path):
                 raise InstallError("missing from the installed libtorch tree: {0}".format(path))
