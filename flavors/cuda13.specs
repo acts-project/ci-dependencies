@@ -35,3 +35,5 @@ alpaka backend=cuda
 #   cccl     cuda@13.3 already ships CCCL 3.3.3; traccc pins 2.7.0 separately.
 #   vc       Off in ACTS/detray by default, so nothing requests it.
 #   dfelibs  Dead upstream; slated for vendoring instead.
+
+modulemapgraph@1.4.2 +cuda ~executables
