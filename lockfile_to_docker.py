@@ -199,6 +199,62 @@ class Spec(BaseModel):
     #     return Spec(name=info["name"], version=info["version"], hash=info["hash"])
 
 
+def runtime_closure(root_hash: str, concrete_specs: dict[str, Spec]) -> set[str]:
+    """Specs whose files are present in the buildcache image of `root_hash`.
+
+    Spack publishes one layer per non-external spec in a root's runtime
+    closure, so this is exactly what `COPY --from=<root image> /spack /spack`
+    pulls in -- the root's dependencies come along whether we ask for them or
+    not.
+    """
+    seen: set[str] = set()
+    stack = [root_hash]
+    while stack:
+        current = stack.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        for dep in concrete_specs[current].dependencies or []:
+            if dep.is_build_only or concrete_specs[dep.hash].is_external:
+                continue
+            stack.append(dep.hash)
+    return {h for h in seen if not concrete_specs[h].is_external}
+
+
+def select_covering_roots(
+    roots: list[Spec], closures: dict[str, set[str]]
+) -> list[Spec]:
+    """Drop roots whose closures are already covered by the roots we keep.
+
+    Since every COPY drags in a whole closure, copying from all of them
+    rewrites shared dependencies many times over -- the CUDA stack moves the
+    4 GB toolkit seven times, which is what exhausts the runner's disk. A
+    covering subset produces a byte-identical /spack: install prefixes are
+    hash-suffixed, so the closures partition the tree and no file is ever
+    written twice, leaving COPY order irrelevant.
+    """
+    remaining = set().union(*closures.values())
+    keep: set[str] = set()
+    while remaining:
+        # Tie-break on full_name so the generated Dockerfile is reproducible.
+        best = min(
+            roots,
+            key=lambda spec: (-len(closures[spec.hash] & remaining), spec.full_name),
+        )
+        gain = closures[best.hash] & remaining
+        if not gain:
+            break
+        keep.add(best.hash)
+        remaining -= gain
+
+    selected = [spec for spec in roots if spec.hash in keep]
+    covered = set().union(*(closures[spec.hash] for spec in selected))
+    assert covered == set().union(*closures.values()), (
+        "covering subset does not reproduce the full spec set"
+    )
+    return selected
+
+
 @app.command()
 def main(
     lockfile_path: Annotated[
@@ -228,6 +284,14 @@ def main(
     ] = "ghcr.io/acts-project/spack-buildcache",
     verbose: bool = False,
     flatten: bool = False,
+    minimize_copies: Annotated[
+        bool,
+        typer.Option(
+            help="Emit COPYs only for a covering subset of the root specs. "
+            "The resulting /spack is identical, but shared dependencies are "
+            "moved once instead of once per dependent root."
+        ),
+    ] = True,
 ):
     if not lockfile_path.exists():
         print(f"Lockfile {lockfile_path} does not exist")
@@ -252,14 +316,29 @@ def main(
 
     spec_blocks: list[list[Spec]] = []
 
-    for root in lockfile["roots"]:
-        spec = concrete_specs[root["hash"]]
+    root_specs = [concrete_specs[root["hash"]] for root in lockfile["roots"]]
+
+    if minimize_copies:
+        closures = {
+            spec.hash: runtime_closure(spec.hash, concrete_specs)
+            for spec in root_specs
+        }
+        selected_roots = select_covering_roots(root_specs, closures)
+        dropped = len(root_specs) - len(selected_roots)
+        console.print(
+            f"Covering subset: [bold]{len(selected_roots)}[/bold] of "
+            f"{len(root_specs)} roots ({dropped} already covered)\n"
+        )
+    else:
+        selected_roots = root_specs
+
+    for spec in selected_roots:
         console.print(spec.markup)
 
         block: list[Spec] = []
 
         if flatten:
-            for dep in spec.dependencies:
+            for dep in spec.dependencies or []:
                 full_dep = concrete_specs[dep.hash]
                 if dep.is_build_only or full_dep.is_external:
                     continue
