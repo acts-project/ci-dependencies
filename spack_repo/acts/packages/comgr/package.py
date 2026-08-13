@@ -38,9 +38,9 @@ class Comgr(Package):
     # All content comes from `hip`; there is nothing to fetch here.
     has_code = False
 
-    version("6.4.3")
+    version("7.2.3")
 
-    depends_on("hip@6.4.3", when="@6.4.3")
+    depends_on("hip@7.2.3", when="@7.2.3")
 
     # Accepted for compatibility with packages that spell out the builtin
     # package's variants. AMD ships no sanitizer build in the binary rpms.

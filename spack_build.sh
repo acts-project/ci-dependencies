@@ -41,6 +41,25 @@ if [ -z "${CXXSTD:-}" ]; then
     exit 1
 fi
 
+# Consume CXXSTD into a shell variable and drop it from the environment. Spack
+# passes the ambient environment through to every package build, and `CXXSTD` is
+# a name build systems use: nccl's makefiles/common.mk does
+# `CXXSTD ?= -std=c++17` and then puts $(CXXSTD) straight into CXXFLAGS and
+# NVCUFLAGS. Make treats an environment variable as already set, so `?=` never
+# applies the default, our `CXXSTD=23` wins, and the compile line gets a bare
+# `23`: `g++: error: 23: linker input file not found`.
+#
+# Nothing below needs it in the environment — it is only read to build the
+# `packages:all:require` entry, cross-check ROOT, and name TARGET_TRIPLET — so
+# unsetting it here (rather than around `spack install`) keeps it out of every
+# child process. `set -u` is on, so a missed reference below fails loudly
+# instead of quietly requesting an empty standard.
+#
+# COMPILER and FLAVOR are the same shape of hazard, but both are still needed in
+# the environment further down, and no package has been seen to read them.
+cxxstd="$CXXSTD"
+unset CXXSTD
+
 # Accelerator flavor: `host` (default) builds the plain CPU stack and is a no-op
 # below. A non-host value (e.g. `cuda90`, `rocm-gfx90a`) overlays the matching
 # fragments under flavors/ onto the base environment and is appended to
@@ -162,13 +181,32 @@ end_section
 start_section "Select compiler and cxxstd"
 spack -e . compiler list
 echo "Looking for compiler: $COMPILER"
-spack -e . compiler list | grep "$COMPILER"
+if [ -n "${COMPILER_MATCH_MAJOR:-}" ]; then
+  # Opt-in for host builds, where the exact patch version pinned in the matrix
+  # is unlikely to be what's actually installed: fall back to any compiler of
+  # the same name and major version, and rewrite $COMPILER to the one found so
+  # everything below (the require: entries, TARGET_TRIPLET) uses a real,
+  # concretely-installed spec rather than the unmatched exact one.
+  compiler_name="${COMPILER%@*}"
+  compiler_major="${COMPILER#*@}"
+  compiler_major="${compiler_major%%.*}"
+  echo "COMPILER_MATCH_MAJOR set: matching ${compiler_name}@${compiler_major}.* instead of exact $COMPILER"
+  resolved="$(spack -e . compiler list | grep -oE "${compiler_name}@${compiler_major}(\.[0-9]+)*\b" | head -1)"
+  if [ -z "$resolved" ]; then
+    echo "ERROR: no ${compiler_name}@${compiler_major}.x compiler found" >&2
+    exit 1
+  fi
+  echo "Resolved $COMPILER -> $resolved"
+  COMPILER="$resolved"
+else
+  spack -e . compiler list | grep "$COMPILER"
+fi
 # Require the compiler as the provider of the C/C++ language virtuals rather than
 # as a blanket `%compiler` dependency on `packages:all` (which spack warns is
 # really a provider requirement). Fortran is left unconstrained on purpose: the
 # llvm/apple-clang matrix entries don't provide fortran, so it resolves freely
 # (typically to gcc), matching the previous behavior.
-spack -e . config add "packages:all:require:[\"cxxstd=$CXXSTD\"]"
+spack -e . config add "packages:all:require:[\"cxxstd=$cxxstd\"]"
 spack -e . config add "packages:c:require:[\"$COMPILER\"]"
 spack -e . config add "packages:cxx:require:[\"$COMPILER\"]"
 end_section
@@ -178,31 +216,35 @@ spack -e . concretize -Uf
 spack -e . find -c
 end_section
 
-echo "+ Spack build"
-args="--no-check-signature --show-log-on-error --concurrent-packages 8"
-if [ -n "${FAIL_FAST:-}" ]; then
-  args="$args --fail-fast"
-fi
-if [ -n "${BUILD_JOBS:-}" ]; then
-  args="$args -j $BUILD_JOBS"
-fi
-spack -e . install $args
-
-start_section "Verify ROOT C++ standard"
-root_config="$(spack -e . location -i root)/bin/root-config"
-root_cflags=$("$root_config" --cflags)
-echo "root-config --cflags: $root_cflags"
-if [[ "$root_cflags" =~ c[+][+]([0-9a-z]+) ]]; then
-  root_cxxstd="${BASH_REMATCH[1]}"
+if [ -n "${SKIP_INSTALL:-}" ]; then
+  echo "+ SKIP_INSTALL set: environment created and concretized; skipping 'spack install'."
 else
-  root_cxxstd=""
+  echo "+ Spack build"
+  args="--no-check-signature --show-log-on-error --concurrent-packages 8"
+  if [ -n "${FAIL_FAST:-}" ]; then
+    args="$args --fail-fast"
+  fi
+  if [ -n "${BUILD_JOBS:-}" ]; then
+    args="$args -j $BUILD_JOBS"
+  fi
+  spack -e . install $args
+
+  start_section "Verify ROOT C++ standard"
+  root_config="$(spack -e . location -i root)/bin/root-config"
+  root_cflags=$("$root_config" --cflags)
+  echo "root-config --cflags: $root_cflags"
+  if [[ "$root_cflags" =~ c[+][+]([0-9a-z]+) ]]; then
+    root_cxxstd="${BASH_REMATCH[1]}"
+  else
+    root_cxxstd=""
+  fi
+  echo "ROOT C++ standard: '${root_cxxstd}' (expected '$cxxstd')"
+  if [ "$root_cxxstd" != "$cxxstd" ]; then
+    echo "ERROR: ROOT reports C++ standard '$root_cxxstd' but '$cxxstd' was requested"
+    exit 1
+  fi
+  end_section
 fi
-echo "ROOT C++ standard: '${root_cxxstd}' (expected '$CXXSTD')"
-if [ "$root_cxxstd" != "$CXXSTD" ]; then
-  echo "ERROR: ROOT reports C++ standard '$root_cxxstd' but '$CXXSTD' was requested"
-  exit 1
-fi
-end_section
 
 function set_env {
   key="$1"
@@ -220,7 +262,7 @@ set_env TARGET_ARCH "$(spack arch --family)"
 # `host` keeps the historical 3-token triplet byte-for-byte; any other flavor
 # adds a fourth token so its artifacts never collide with the CPU stack.
 if [ "$FLAVOR" = "host" ]; then
-  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${CXXSTD}"
+  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${cxxstd}"
 else
-  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${CXXSTD}_${FLAVOR}"
+  set_env TARGET_TRIPLET "${TARGET_ARCH}_${COMPILER}_cxx${cxxstd}_${FLAVOR}"
 fi

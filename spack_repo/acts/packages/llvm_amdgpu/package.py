@@ -35,9 +35,9 @@ class LlvmAmdgpu(Package, CompilerPackage):
     # All content comes from `hip`; there is nothing to fetch here.
     has_code = False
 
-    version("6.4.3")
+    version("7.2.3")
 
-    depends_on("hip@6.4.3", when="@6.4.3")
+    depends_on("hip@7.2.3", when="@7.2.3")
 
     # Accepted for compatibility with packages that spell out the builtin
     # package's variants (the device libraries are always installed here).
@@ -52,7 +52,11 @@ class LlvmAmdgpu(Package, CompilerPackage):
     # than the pinned one, and without the interface below that is an
     # AttributeError rather than a solve. The prefix really is an AMD clang
     # install, so answering these truthfully is also the honest thing to do.
-    # No fortran: builtin only declares it for @7.0:, matching AMD's flang.
+    # Fortran is left out deliberately. AMD does ship flang from 7.0 on (this
+    # prefix has bin/flang and bin/amdflang, and builtin declares fortran for
+    # @7.0:), but nothing in this stack needs a HIP-side Fortran, and declaring
+    # it would let the solver satisfy the *environment's* unconstrained fortran
+    # virtual with amdflang instead of gcc.
     provides("c", "cxx")
     compiler_languages = ["c", "cxx"]
     c_names = ["amdclang"]

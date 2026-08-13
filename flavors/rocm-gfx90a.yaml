@@ -10,4 +10,4 @@ packages:
   # there. Pin explicitly so the concretizer can't pick a different one.
   hip:
     require:
-    - "@6.4.3"
+    - "@7.2.3"

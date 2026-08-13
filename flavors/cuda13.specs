@@ -21,6 +21,22 @@ cudnn@9.21.0.82-13
 # nvinfer_plugin, which pulls the full libnvinfer back via DT_NEEDED anyway.
 tensorrt@11.1.0.106 runtime=full builder=sm75
 
+# libtorch, for ACTS' Gnn plugin (find_package(Torch), gated on
+# ACTS_GNN_ENABLE_TORCH). Not in upstream Spack, which has only py-torch and
+# builds it from source; spack_repo/acts/packages/libtorch unpacks PyTorch's own
+# prebuilt C++ distribution instead. It lives here rather than in the base
+# spack.yaml because the tree is large enough to be worth paying for only where
+# the GPU plugin is actually built: 481 MB downloaded, 961 MB installed.
+#
+# `cuda_arch` is deliberately not a variant of it (see the package): the
+# prebuilt arrives with whatever fatbin set PyTorch chose for the release.
+#
+# The zip bundles no CUDA at all despite its "shared-with-deps" name, so this is
+# what makes cudnn a second consumer alongside ONNX Runtime, and what pulls in
+# nccl and cusparselt — all three are DT_NEEDED by libtorch_cuda.so, at the
+# versions the package pins.
+libtorch@2.13.0 +cuda
+
 # traccc/detray/algebra-plugins are vendored/FetchContent'd by ACTS, not taken
 # from the environment. vecmem and covfie are, pinned to ACTS' exact versions
 # (_acts_vecmem_version / _acts_covfie_version) — re-check when ACTS moves.
@@ -35,3 +51,5 @@ alpaka backend=cuda
 #   cccl     cuda@13.3 already ships CCCL 3.3.3; traccc pins 2.7.0 separately.
 #   vc       Off in ACTS/detray by default, so nothing requests it.
 #   dfelibs  Dead upstream; slated for vendoring instead.
+
+modulemapgraph@1.4.2 +cuda ~executables
