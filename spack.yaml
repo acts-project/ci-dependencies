@@ -43,6 +43,25 @@ spack:
     - arrow@24.0.0 +bz2 +parquet +zlib +zstd +dataset +filesystem +compute +snappy +brotli +python
 
     - actsvg@0.4.56
+
+    # detray/traccc host (CPU) builds. ACTS vendors traccc, detray and
+    # algebra-plugins via FetchContent, but resolves vecmem and covfie with
+    # find_package, so they have to come from the environment. Versions are the
+    # newest the consumers agree on: vecmem 1.25.0 is what both ACTS
+    # (_acts_vecmem_version) and traccc/extern pin; covfie 0.15.6 is ahead of
+    # ACTS' 0.15.2 and traccc's 0.15.4 floors, which are find_package minimums.
+    # Re-check when either moves.
+    #
+    # These are the plain CPU builds. The cuda13 / rocm-gfx90a flavors flip the
+    # accelerator variant on these same root specs (see flavors/*.specs), so the
+    # versions live here only.
+    - vecmem@1.25.0
+    - covfie@0.15.6
+
+    # Alpaka, traccc's portability backend, serial (CPU) backend only. Pinned to
+    # what traccc/extern/alpaka fetches, so a TRACCC_USE_SYSTEM_ALPAKA build gets
+    # the version traccc is tested against rather than the newest spack has.
+    - alpaka@2.0.0 backend=serial
   packages:
     all:
       target:
