@@ -38,14 +38,18 @@ tensorrt@11.1.0.106 runtime=full builder=sm75
 libtorch@2.13.0 +cuda
 
 # traccc/detray/algebra-plugins are vendored/FetchContent'd by ACTS, not taken
-# from the environment. vecmem and covfie are, pinned to ACTS' exact versions
-# (_acts_vecmem_version / _acts_covfie_version) — re-check when ACTS moves.
-vecmem@1.25.0+cuda
-covfie@0.15.6+cuda
+# from the environment. vecmem and covfie are — and are declared (with their
+# versions) as root specs in the base spack.yaml, so these lines are `spack
+# change` merges that only flip the accelerator variant. Don't repeat the
+# version here; the base is the single place it is pinned.
+vecmem +cuda
+covfie +cuda
 
-# Alpaka, traccc's portability backend. `backend=cuda` not `cuda_only`, which
-# would drop the serial backend too.
-alpaka backend=cuda
+# Alpaka, traccc's portability backend. `serial,cuda` rather than `cuda`, since
+# a multi-valued variant substitutes wholesale on merge and would drop the
+# serial backend the base spack.yaml asks for; `cuda_only` conflicts with every
+# other backend and so cannot express this at all.
+alpaka backend=serial,cuda
 
 # Deliberately absent:
 #   cccl     cuda@13.3 already ships CCCL 3.3.3; traccc pins 2.7.0 separately.

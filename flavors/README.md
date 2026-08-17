@@ -62,9 +62,16 @@ At least one of the two must exist, or the build fails with "unknown flavor".
    `default: false` (a GPU flavor must never be the arch-canonical lockfile).
 
 > The `.specs` in this directory are **starting points**. Some packages
-> (`traccc`, `detray`, `covfie`, `vecmem`, `algebra-plugins`) may not exist in
-> upstream Spack and may need a `package.py` under
-> `spack_repo/acts/packages/`. Always concretize before enabling in CI.
+> (`traccc`, `detray`, `algebra-plugins`) may not exist in upstream Spack and
+> may need a `package.py` under `spack_repo/acts/packages/`. Always concretize
+> before enabling in CI.
+>
+> `vecmem`, `covfie` and `alpaka` are upstream *and* are root specs in the base
+> `spack.yaml` (the CPU builds need them for detray/traccc). A flavor therefore
+> only flips their accelerator variant and must not repeat their version — and,
+> for a multi-valued variant like alpaka's `backend`, must restate every value
+> it wants kept, since `spack change` substitutes the variant wholesale rather
+> than merging values into it.
 
 ## ROCm is a binary toolchain here
 

@@ -15,9 +15,11 @@ hip
 
 # traccc GPU stack. vecmem uses its own `+hip` variant; covfie is a
 # ROCmPackage so it's `+rocm` (maps to COVFIE_PLATFORM_HIP) and also pulls in
-# llvm-amdgpu + hsa-rocr-dev.
-vecmem@1.25.0 +hip
-covfie@0.15.6 +rocm
+# llvm-amdgpu + hsa-rocr-dev. Both are root specs in the base spack.yaml, so
+# these are `spack change` merges that only flip the accelerator variant — the
+# versions stay pinned in one place, the base.
+vecmem +hip
+covfie +rocm
 
 # rocThrust — the HIP-side Thrust traccc resolves via find_package(rocthrust)
 # when TRACCC_BUILD_HIP is on. Pinned to match hip@7.2.3 from rocm-gfx90a.yaml,
@@ -58,9 +60,11 @@ rocrand@7.2.3
 # monorepo, and the package builds one subdirectory out of it.
 hiprand@7.2.3 +rocm
 
-# Alpaka, traccc's portability backend. `backend=hip` not `hip_only`, which
-# would drop the serial backend too.
-alpaka backend=hip
+# Alpaka, traccc's portability backend. `serial,hip` rather than `hip`, since a
+# multi-valued variant substitutes wholesale on merge and would drop the serial
+# backend the base spack.yaml asks for; `hip_only` conflicts with every other
+# backend and so cannot express this at all.
+alpaka backend=serial,hip
 
 # Deliberately absent, as in cuda13: ACTS vendors/FetchContents traccc,
 # detray and algebra-plugins, so none is a system package. Vc is off on both

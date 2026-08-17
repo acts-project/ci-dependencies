@@ -33,6 +33,11 @@ console = Console()
 REPO_ROOT = Path(__file__).parent
 WORKFLOW_FILE = REPO_ROOT / ".github/workflows/build.yml"
 
+# Mirrors the `cxxstd: ${{ matrix.cxxstd || '20' }}` default in build.yml: most
+# matrix entries leave cxxstd unset, and only the single C++23 build spells it
+# out. Keep in sync with build.yml and build_one.yml's input default.
+DEFAULT_CXXSTD = "20"
+
 # CI sets up spack via `spack/setup-spack@v2`, which defaults to the `develop`
 # branch, then applies any spack_patches/*.patch (see build_one.yml). These
 # mirror that so a local build uses the same spack as CI.
@@ -125,9 +130,9 @@ def load_macos_matrix() -> list[dict]:
     for e in entries:
         e = dict(e)
         e.setdefault("label", e.get("os", "macos"))
-        # build_macos's `with:` block hardcodes cxxstd: "23" for every entry;
+        # build_macos's `with:` block hardcodes cxxstd: "20" for every entry;
         # matrix.include itself never sets it.
-        e.setdefault("cxxstd", "23")
+        e.setdefault("cxxstd", DEFAULT_CXXSTD)
         out.append(e)
     return out
 
@@ -162,7 +167,7 @@ def describe_entry(entry: dict, index: int | None = None) -> str:
     if entry.get("label"):
         parts.append(f"[bold green]{entry['label']}[/bold green]")
     parts.append(f"[yellow]{entry['compiler']}[/yellow]")
-    parts.append(f"C++{entry.get('cxxstd', '23')}")
+    parts.append(f"C++{entry.get('cxxstd', DEFAULT_CXXSTD)}")
     parts.append(f"flavor [red]{entry_flavor(entry)}[/red]")
     platform = entry.get("image") or f"macOS {entry.get('os', '')}, xcode {entry.get('xcode', '')}"
     parts.append(f"[dim]{platform}[/dim]")
@@ -224,7 +229,7 @@ def build_table(entries: list[dict], indices: list[int] | None = None) -> Table:
             e.get("label", ""),
             e.get("image") or f"(macOS {e.get('os', '')}, xcode {e.get('xcode', '')})",
             e["compiler"],
-            str(e.get("cxxstd", "23")),
+            str(e.get("cxxstd", DEFAULT_CXXSTD)),
             entry_flavor(e),
             "✓" if e.get("default") else "",
         )
@@ -455,7 +460,7 @@ def _docker_run_base(
         "-e",
         f"COMPILER_PATH={entry.get('compiler_path', '')}",
         "-e",
-        f"CXXSTD={str(entry.get('cxxstd', '23'))}",
+        f"CXXSTD={str(entry.get('cxxstd', DEFAULT_CXXSTD))}",
         # Without this every entry would build the plain CPU stack, silently:
         # spack_build.sh defaults FLAVOR to `host`, and the flavor is the only
         # thing that distinguishes e.g. ubuntu26.04-rocm from ubuntu26.04.
@@ -653,7 +658,7 @@ def entry_slug(e: dict) -> str:
     """
     base = e.get("label") or (e.get("image", "").rsplit("/", 1)[-1] if e.get("image") else "host")
     compiler = e["compiler"].replace("@", "-").replace("/", "-").replace(" ", "")
-    slug = f"{base}_{compiler}_cxx{e.get('cxxstd', '23')}"
+    slug = f"{base}_{compiler}_cxx{e.get('cxxstd', DEFAULT_CXXSTD)}"
     flavor = entry_flavor(e)
     if flavor != "host":
         slug += f"_{flavor}"
@@ -725,7 +730,7 @@ def execute_host_build(
     env["SPACK_ROOT"] = spack_root
     env["COMPILER"] = entry["compiler"]
     env["COMPILER_PATH"] = entry.get("compiler_path", "")
-    env["CXXSTD"] = str(entry.get("cxxstd", "23"))
+    env["CXXSTD"] = str(entry.get("cxxstd", DEFAULT_CXXSTD))
     env["FLAVOR"] = entry_flavor(entry)
     if jobs is not None:
         env["BUILD_JOBS"] = str(jobs)
@@ -814,7 +819,7 @@ def entry_searchable(e: dict) -> str:
         [
             e.get("compiler", ""),
             e.get("image", ""),
-            str(e.get("cxxstd", "23")),
+            str(e.get("cxxstd", DEFAULT_CXXSTD)),
             # label and flavor are the only handles on the GPU entries: they
             # share image, compiler and cxxstd with the plain CPU build.
             e.get("label", ""),

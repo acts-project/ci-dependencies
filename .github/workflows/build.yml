@@ -38,11 +38,11 @@ jobs:
       os: ${{ matrix.os }}
       xcode: ${{ matrix.xcode }}
       compiler: ${{ matrix.compiler }}
-      cxxstd: "23"
+      cxxstd: "20"
       default: ${{ matrix.default }}
 
   build_container:
-    name: ${{ matrix.label }} · ${{ matrix.compiler }}${{ matrix.cxxstd == '20' && ' (C++20)' || '' }}
+    name: ${{ matrix.label }} · ${{ matrix.compiler }}${{ matrix.cxxstd == '23' && ' (C++23)' || '' }}
     permissions:
       contents: write
       packages: write
@@ -83,13 +83,14 @@ jobs:
             os: ubuntu-24.04-arm
             default: false
 
-          # Keeps C++20 alive alongside the default C++23 build. default: false
+          # Single C++23 build alongside the default C++20 ones, so the standard
+          # stays exercised without every build depending on it. default: false
           # so it never overwrites the canonical arch lockfile.
           - image: ghcr.io/acts-project/ubuntu2604:89
             label: ubuntu26.04
             compiler: gcc@15.2.0
             os: ubuntu-latest
-            cxxstd: "20"
+            cxxstd: "23"
             default: false
 
           # GPU flavors overlay flavors/<flavor>.{yaml,specs} onto the base env;
@@ -115,7 +116,7 @@ jobs:
       image: ${{ matrix.image }}
       compiler: ${{ matrix.compiler }}
       compiler_path: ${{ matrix.compiler_path || '' }}
-      cxxstd: ${{ matrix.cxxstd || '23' }}
+      cxxstd: ${{ matrix.cxxstd || '20' }}
       flavor: ${{ matrix.flavor || 'host' }}
       default: ${{ matrix.default }}
 
@@ -355,7 +356,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REF_NAME: ${{ github.ref_name }}
           IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
-          PATTERN: ".*ubuntu26.04.*gcc.*cxx23"
+          PATTERN: ".*ubuntu26.04.*gcc.*cxx20"
         run: |
           if [[ "$IS_TAG" == "true" ]]; then
             uv run merge_images.py "$REF_NAME" "$PATTERN" --push
