@@ -58,9 +58,10 @@ jobs:
             os: ubuntu-latest
             default: true
 
-          # The one C++23 build in the matrix, so the standard stays exercised
-          # without every build depending on it. default: false so it never
-          # overwrites the canonical arch lockfile.
+          # C++23, which this job requires. Together with the ubuntu26.04/gcc
+          # entry below it is where the standard stays exercised, without every
+          # build depending on it. default: false so it never overwrites the
+          # canonical arch lockfile.
           - image: ghcr.io/acts-project/ubuntu2604_clang22:89
             label: ubuntu26.04-clang22
             compiler: llvm@22.1.8
@@ -85,6 +86,18 @@ jobs:
             label: ubuntu26.04-arm
             compiler: gcc@15.2.0
             os: ubuntu-24.04-arm
+            default: false
+
+          # C++23 on gcc as well, so the standard is covered on both compilers
+          # rather than only where clang forces it. Same image, compiler and
+          # arch as the default ubuntu26.04 build above, so cxxstd is the only
+          # variable between the two. default: false, as for every non-canonical
+          # build.
+          - image: ghcr.io/acts-project/ubuntu2604:89
+            label: ubuntu26.04
+            compiler: gcc@15.2.0
+            os: ubuntu-latest
+            cxxstd: "23"
             default: false
 
           # GPU flavors overlay flavors/<flavor>.{yaml,specs} onto the base env;
