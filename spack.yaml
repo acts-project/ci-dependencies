@@ -1,7 +1,7 @@
 spack:
   specs:
     - boost@1.90.0 +program_options +test +json +graph +filesystem
-    - cmake@4.3.3
+    - cmake@4.4.2
     - ccache@4.12
     - edm4hep@1.1
     - eigen@5.0.1
@@ -42,7 +42,7 @@ spack:
     - benchmark@1.9.5
     - arrow@24.0.0 +bz2 +parquet +zlib +zstd +dataset +filesystem +compute +snappy +brotli +python
 
-    - actsvg@0.4.56
+    - actsvg@0.4.57
 
     # detray/traccc host (CPU) builds. ACTS vendors traccc, detray and
     # algebra-plugins via FetchContent, but resolves vecmem and covfie with
@@ -61,7 +61,7 @@ spack:
     # Alpaka, traccc's portability backend, serial (CPU) backend only. Pinned to
     # what traccc/extern/alpaka fetches, so a TRACCC_USE_SYSTEM_ALPAKA build gets
     # the version traccc is tested against rather than the newest spack has.
-    - alpaka@2.0.0 backend=serial
+    - alpaka@2.1.1 backend=serial
   packages:
     all:
       target:
