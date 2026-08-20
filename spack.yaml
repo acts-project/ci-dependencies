@@ -33,9 +33,9 @@ spack:
 
     - onnxruntime-bin@1.24.4
 
-    - millepede@5 +root
-    - mille@1 +root
-    - generalbrokenlines@4 +root
+    - millepede@5.1.5 +root
+    - mille@1.1.0 +root
+    - generalbrokenlines@4.0.3 +root
 
     - googletest@1.17.0
       # perf counters only supported on linux
