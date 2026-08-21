@@ -78,6 +78,18 @@ For a flavor `<name>`, `spack_build.sh` looks for two optional files:
 
 At least one of the two must exist, or the build fails with "unknown flavor".
 
+## Keeping versions current
+
+`check_versions.py` (run nightly by `.github/workflows/bump_versions.yml`)
+checks every `flavors/*.specs` file the same way it checks `spack.yaml`, and
+`--update` rewrites versioned lines in place. A spec whose version is capped
+by something the checker can't see — like `rocthrust@7.2.3` here, which is
+pinned by an exact `depends_on("hip@...")` to whatever version
+`spack_repo/acts/packages/hip/package.py`'s hand-maintained rpm table
+currently supports — carries a trailing `# no-auto-update: ...` comment. That
+keeps it visible as "outdated" in the report without `--update` silently
+bumping it past what `hip` can satisfy.
+
 ## Adding a flavor
 
 1. Create `flavors/<name>.yaml` and/or `flavors/<name>.specs`.

@@ -30,7 +30,7 @@ covfie +rocm
 # comgr override: rocthrust -> rocprim -> comgr, and the builtin comgr can't
 # build from AMD's rpm layout (wants clang's CMake package where the rpm
 # doesn't ship it); AMD's comgr rpm is already unpacked by `hip`.
-rocthrust@7.2.3
+rocthrust@7.2.3  # no-auto-update: exact hip@ pin, capped by spack_repo/acts/packages/hip/package.py's rpm table
 
 # rocRAND. Same exact `depends_on("hip@X")` pin as rocthrust, so it moves with
 # the flavor's ROCm version and constrains which patch release is reachable in
@@ -43,7 +43,7 @@ rocthrust@7.2.3
 # gcc@15.2.0), so it resolves to the same external gcc rather than building one
 # — but it does mean this flavor now requires an image with Fortran.
 #
-rocrand@7.2.3
+rocrand@7.2.3  # no-auto-update: exact hip@ pin, capped by spack_repo/acts/packages/hip/package.py's rpm table
 
 # hipRAND, the portable wrapper consumers reach through find_package(hiprand).
 # A separate package from rocrand upstream, so both are needed: this one only
@@ -58,7 +58,7 @@ rocrand@7.2.3
 # Note the source is large for what it is: from 7.1.1 on, url_for_version
 # switches from the per-project hipRAND tarball to the whole ROCm/rocm-libraries
 # monorepo, and the package builds one subdirectory out of it.
-hiprand@7.2.3 +rocm
+hiprand@7.2.3 +rocm  # no-auto-update: exact hip@ pin, capped by spack_repo/acts/packages/hip/package.py's rpm table
 
 # Alpaka, traccc's portability backend. `serial,hip` rather than `hip`, since a
 # multi-valued variant substitutes wholesale on merge and would drop the serial
