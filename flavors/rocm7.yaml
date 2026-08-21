@@ -1,0 +1,40 @@
+# Spack config overlay for the `rocm7` flavor (AMD, ROCm 7).
+# Merged into the environment via `spack config add -f`. Config sections only —
+# specs live in flavors/rocm7.specs. Express deltas from the base spack.yaml.
+packages:
+  all:
+    # Safe as an `all` entry: packages without an amdgpu_target variant ignore it.
+    #
+    # HIP has no PTX equivalent, so this list is exhaustive rather than a
+    # floor: the stack runs on exactly these targets and fails at kernel launch
+    # ("no kernel image is available") on any other. Adding one is a rebuild of
+    # this flavor, not a new flavor — and Spack's ROCmPackage.amdgpu_targets
+    # carries no generic targets (`gfx11-generic`, ...), so they have to be
+    # enumerated even where AMD's compiler could cover a family in one.
+    #
+    #   gfx90a   MI200        (CDNA 2)
+    #   gfx1101  RX 7700/7800 (RDNA 3)
+    #
+    # Only rocrand grows with this list: it is the one spec here that bakes
+    # device code into a library. rocprim/rocthrust are header-only (AMD ships
+    # them as -devel rpms with no runtime lib), covfie and alpaka are too, and
+    # vecmem has no amdgpu_target variant at all — so those only rehash.
+    #
+    # Cost per target, read out of the offload bundles in AMD's own
+    # librocrand.so (which ships 14 targets): ~53 MB of fat binary each, on a
+    # ~47 MB target-independent host-side base. gfx1101 measured 54.1 MB, so
+    # adding it roughly doubles rocrand's ~100 MB prefix — but only ~5 MB of
+    # that survives gzip in the image layer, since device code compresses ~11x.
+    #
+    # Quoted, and deliberately not the bare `[a=b,c]` flow sequence the other
+    # flavors use: YAML splits an unquoted flow sequence on the comma, which
+    # would yield ["amdgpu_target=gfx90a", "gfx1101"] and hand Spack a bogus
+    # second variant. Single-valued lists like cuda13's `[cuda_arch=75]` don't
+    # hit this; anything multi-valued must be quoted.
+    variants: ["amdgpu_target=gfx90a,gfx1101"]
+  # hip/llvm-amdgpu/hsa-rocr-dev/comgr resolve to the binary packages in
+  # spack_repo/acts/packages/, which only carry the ROCm releases recorded
+  # there. Pin explicitly so the concretizer can't pick a different one.
+  hip:
+    require:
+    - "@7.2.3"

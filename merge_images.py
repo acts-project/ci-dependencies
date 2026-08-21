@@ -64,7 +64,7 @@ def main(
 
     ex = re.compile(pattern)
     # fullmatch, so a pattern ending in `cxx20` does not also pull in the
-    # flavored `cxx20_cuda13` / `cxx20_rocm-gfx90a` builds. Those are published
+    # flavored `cxx20_cuda13` / `cxx20_rocm7` builds. Those are published
     # under their own per-arch tags only; merging them here would put several
     # x86_64 images into one manifest list.
     matching = [a for a in dockerfiles if ex.fullmatch(a)]

@@ -39,7 +39,7 @@ from spack.package import *
 # here so the package is whole, not because anything asks for them yet.
 #
 # Deliberately absent: the ROCm build. It exists, and rocm7.2 would even match
-# the rocm-gfx90a flavor, but it is a 6.1 GB download whose unpacked tree does
+# the rocm7 flavor, but it is a 6.1 GB download whose unpacked tree does
 # not fit a CI runner, and ACTS has no HIP torch path to spend it on.
 _DISTS = {
     "2.13.0": {

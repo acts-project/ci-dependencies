@@ -14,23 +14,51 @@ special flavor `host` is the plain CPU stack and produces the historical
 three-token triplet with no overlay.
 
 Name a flavor after what a consumer cannot work around — the hard compatibility
-boundaries — and leave the rest to the lockfile. Which axes those are differs by
-vendor, which is why `cuda13` and `rocm-gfx90a` are spelled differently:
+boundaries — and leave the rest to the lockfile. In practice that is the
+**toolkit major version** for both vendors, which is why `cuda13` and `rocm7`
+are spelled the same way:
 
-- **CUDA**: the toolkit major version is hard (a consumer linking
-  `libcudart.so.12` cannot use a `cuda13` stack, and it decides whether prebuilt
-  binaries such as ONNX Runtime's CUDA execution provider load), while the GPU
-  target is soft — `-arch=sm_75` embeds PTX that the driver JIT-compiles onto
-  newer GPUs. So the toolkit is in the name and the arch is not; `cuda_arch` is
-  still visible in the concretized lockfile.
-- **ROCm**: there is no PTX equivalent. HIP embeds a code object per gfx target,
-  so gfx90a code will not run on gfx1100 and the target *is* a hard boundary —
-  hence `rocm-gfx90a`.
+- **CUDA**: a consumer linking `libcudart.so.12` cannot use a `cuda13` stack,
+  and the major decides whether prebuilt binaries such as ONNX Runtime's CUDA
+  execution provider load.
+- **ROCm**: same shape — `libamdhip64.so.7` is the soname AMD ships for all of
+  7.x, so a binary built against ROCm 6 cannot load against a ROCm 7 stack.
 
-Add an arch to a CUDA flavor name only once you ship two of them side by side
-(say an sm_90-tuned build alongside the portable one), and spell it `sm<arch>`
-if you do: `cuda75` and `cuda90` read as CUDA 7.5 and CUDA 9.0, both of which
-were real toolkit versions.
+The GPU target stays out of the name in both, but for different reasons, and
+the difference matters to whoever consumes the image:
+
+- For CUDA it is genuinely soft. `-arch=sm_75` embeds PTX that the driver
+  JIT-compiles onto anything newer, so `cuda13` runs on GPUs that did not exist
+  when it was built.
+- For ROCm it is hard *per GPU* — HIP embeds a code object per gfx target and
+  has no PTX equivalent — but a flavor ships a **set** of targets, and a set is
+  a capability list rather than a boundary, so it cannot go in the name without
+  churning every time the list grows. The consequence is that `rocm7`
+  over-promises where `cuda13` does not: it runs on exactly the targets
+  enumerated in `rocm7.yaml` and fails at kernel launch ("no kernel image is
+  available") anywhere else. Keep that list documented there, and treat adding
+  a GPU as a rebuild of the flavor rather than a new one.
+
+`cuda_arch` / `amdgpu_target` stay visible in the concretized lockfile either
+way, so nothing is lost by leaving them out of the name.
+
+Two spelling rules:
+
+- The version token is the **major** only. Add a dotted minor (`rocm7.2`) only
+  once two minors have to coexist — which is likelier on the ROCm side, where
+  `rocthrust`/`rocrand` pin `hip@` to an exact version and so nail a flavor to
+  one patch release. This is also what disambiguates a future `rocm10` (ROCm 10,
+  not ROCm 1.0).
+- Add an arch to a name only once you ship two of them side by side (say an
+  sm_90-tuned CUDA build alongside the portable one), and spell it `sm<arch>`
+  if you do: `cuda75` and `cuda90` read as CUDA 7.5 and CUDA 9.0, both of which
+  were real toolkit versions.
+
+Renaming a flavor is cheap — two files here, one matrix entry in
+`build.yml` — but it moves `TARGET_TRIPLET`, so the lockfile name, image tag
+and buildcache namespace all move with it and the old artifacts go stale rather
+than updating. That is the point: the tag change is the signal to a consumer
+that the ABI moved under them.
 
 ## File format
 
@@ -98,7 +126,9 @@ directory's `repodata/*-primary.xml.gz` are the rpm file sums, so there is no
 need to download 450 MB to compute them) and bump the `version` and the
 `depends_on("hip@...")` in the other three packages. The reachable versions are
 capped by upstream Spack's `rocthrust`, which pins `hip@` to its own exact
-version, so pick a release both AMD and `rocthrust` ship.
+version, so pick a release both AMD and `rocthrust` ship. A ROCm **major** bump also means renaming
+this flavor (`rocm7` -> `rocm8`) — see [Naming](#naming); a minor or patch bump
+does not.
 
 Check the `_contents` lists in the view packages against the new layout — AMD
 moves paths between majors (7.0 renamed the ROCr doc directory from
