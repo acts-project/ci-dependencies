@@ -55,7 +55,7 @@ spack:
     # These are the plain CPU builds. The cuda13 / rocm-gfx90a flavors flip the
     # accelerator variant on these same root specs (see flavors/*.specs), so the
     # versions live here only.
-    - vecmem@1.26.0
+    - vecmem@1.27.0
     - covfie@0.15.6
 
     # Alpaka, traccc's portability backend, serial (CPU) backend only. Pinned to
