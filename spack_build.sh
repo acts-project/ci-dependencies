@@ -61,7 +61,7 @@ cxxstd="$CXXSTD"
 unset CXXSTD
 
 # Accelerator flavor: `host` (default) builds the plain CPU stack and is a no-op
-# below. A non-host value (e.g. `cuda90`, `rocm-gfx90a`) overlays the matching
+# below. A non-host value (e.g. `cuda13`, `rocm7`) overlays the matching
 # fragments under flavors/ onto the base environment and is appended to
 # TARGET_TRIPLET so all downstream artifacts (lockfile, Dockerfile, image tag,
 # buildcache) are namespaced automatically.

@@ -52,7 +52,7 @@ spack:
     # ACTS' 0.15.2 and traccc's 0.15.4 floors, which are find_package minimums.
     # Re-check when either moves.
     #
-    # These are the plain CPU builds. The cuda13 / rocm-gfx90a flavors flip the
+    # These are the plain CPU builds. The cuda13 / rocm7 flavors flip the
     # accelerator variant on these same root specs (see flavors/*.specs), so the
     # versions live here only.
     - vecmem@1.27.0

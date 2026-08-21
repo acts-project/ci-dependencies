@@ -114,7 +114,7 @@ jobs:
             label: ubuntu26.04-rocm
             compiler: gcc@15.2.0
             os: ubuntu-latest
-            flavor: rocm-gfx90a
+            flavor: rocm7
             default: false
 
     uses: ./.github/workflows/build_one.yml

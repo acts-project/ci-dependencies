@@ -1,6 +1,6 @@
-# Extra specs for the `rocm-gfx90a` flavor (one per line; `#` comments allowed).
-# Added via `spack add` on top of the base environment. amdgpu_target=gfx90a
-# comes from flavors/rocm-gfx90a.yaml (applied only to packages that expose it).
+# Extra specs for the `rocm7` flavor (one per line; `#` comments allowed).
+# Added via `spack add` on top of the base environment. The amdgpu_target list
+# comes from flavors/rocm7.yaml (applied only to packages that expose it).
 #
 # Upstream Spack's `hip` builds the whole ROCm stack from source, which costs
 # hours and more disk than a CI runner has. spack_repo/acts/packages/ overrides
@@ -22,7 +22,7 @@ vecmem +hip
 covfie +rocm
 
 # rocThrust — the HIP-side Thrust traccc resolves via find_package(rocthrust)
-# when TRACCC_BUILD_HIP is on. Pinned to match hip@7.2.3 from rocm-gfx90a.yaml,
+# when TRACCC_BUILD_HIP is on. Pinned to match hip@7.2.3 from rocm7.yaml,
 # since rocthrust@X depends_on hip@X exactly — which is what picks the ROCm
 # patch release for the whole flavor: AMD ships rhel8 rpms for 7.2 through
 # 7.2.4, but upstream Spack only has rocthrust 7.2.0/7.2.1/7.2.3, so 7.2.3 is
@@ -53,7 +53,7 @@ rocrand@7.2.3
 # CudaPackage and a ROCmPackage, exactly one of +cuda/+rocm is required, and
 # spelling it out keeps this readable next to covfie above. It pulls
 # rocrand@7.2.3 (same exact-version pin) and forwards amdgpu_target to it, so
-# the two stay consistent with the flavor's gfx target on their own.
+# the two stay consistent with the flavor's gfx targets on their own.
 #
 # Note the source is large for what it is: from 7.1.1 on, url_for_version
 # switches from the per-project hipRAND tarball to the whole ROCm/rocm-libraries
