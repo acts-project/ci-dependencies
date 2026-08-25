@@ -94,6 +94,12 @@ spack:
   repos:
     acts: spack_repo/acts
 
+  view:
+    default:
+      root: .spack-env/view
+      exclude:
+      - libiconv
+
   mirrors:
     acts-spack-buildcache:
       url: oci://ghcr.io/acts-project/spack-buildcache
