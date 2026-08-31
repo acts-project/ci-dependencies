@@ -117,6 +117,34 @@ jobs:
             flavor: rocm7
             default: false
 
+          # The same rocm7 flavor hosted on clang, at C++20. alpaka's HIP
+          # backend needs the *host* compiler to be clang as well, not just the
+          # device compiler: compiling traccc's device/alpaka at -O3 against the
+          # gcc@15.2.0 rocm7 lockfile takes the clang frontend down
+          # (acts-project/acts#5877, reached through alpaka rather than through
+          # traccc's own HIP code). It reproduces only at Release, which is why
+          # the workaround downstream has been to keep HIP on RelWithDebInfo.
+          # So this is not a coverage build — it is the only stack a consumer
+          # can build HIP at Release against; the gcc entry above stays for
+          # everything else.
+          #
+          # Reusing the existing clang22 image rather than pairing ROCm 7.2.3
+          # with its own bundled clang: AMD's compiler is unpacked from an rpm
+          # by spack_repo/acts/packages/llvm-amdgpu and is not a registered
+          # Spack compiler, so hosting on it would mean building the entire
+          # non-GPU stack (ROOT, Boost, Geant4) with AMD's fork. Nothing needs
+          # that — host and device TUs only have to agree on the standard
+          # library, and this image's clang uses libstdc++ 15, the same one the
+          # gcc builds and AMD's clang link against. The image also ships
+          # gfortran-15, which the flavor needs for rocrand's build-only
+          # Fortran dependency (see flavors/rocm7.specs).
+          - image: ghcr.io/acts-project/ubuntu2604_clang22:89
+            label: ubuntu26.04-clang22-rocm
+            compiler: llvm@22.1.8
+            os: ubuntu-latest
+            flavor: rocm7
+            default: false
+
     uses: ./.github/workflows/build_one.yml
     with:
       os: ${{ matrix.os }}

@@ -113,6 +113,26 @@ bumping it past what `hip` can satisfy.
 > it wants kept, since `spack change` substitutes the variant wholesale rather
 > than merging values into it.
 
+## `rocm7` is built on two host compilers
+
+It is the one flavor with two matrix entries, `gcc@15.2.0` and `llvm@22.1.8`,
+both at C++20. That is not standard coverage — it is a hard requirement of the
+consumer: alpaka's HIP backend needs the *host* compiler to be clang as well,
+not just the device compiler, and compiling traccc's `device/alpaka` at `-O3`
+against the gcc-hosted lockfile takes the clang frontend down
+(acts-project/acts#5877, reached through alpaka rather than through traccc's
+own HIP code). It reproduces only at Release. So the clang-hosted lockfile is
+what a consumer builds HIP at Release against, and the gcc one stays for
+everything else.
+
+The host compiler is deliberately *not* AMD's own clang, even though
+`llvm-amdgpu` below unpacks one: it is not a registered Spack compiler here,
+so hosting on it would mean building the entire non-GPU stack — ROOT, Boost,
+Geant4 — with AMD's fork. Nothing needs that. Host and device translation
+units only have to agree on the standard library, and the `ubuntu2604_clang22`
+image's clang uses libstdc++ 15, the same one the gcc builds and AMD's clang
+link against.
+
 ## ROCm is a binary toolchain here
 
 Spack's `cuda` is a binary installer, but its `hip` builds the entire ROCm stack
