@@ -86,7 +86,7 @@ jobs:
       #     xcode-version: "${{ inputs.xcode }}"
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
 
       - name: Setup Xcode version
         if: startsWith(inputs.os, 'macos')
@@ -272,7 +272,7 @@ jobs:
       - run: |
           cp Dockerfile.* Dockerfile
 
-      - uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4.5.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         if: "inputs.image != '' && !cancelled()"
         with:
           registry: ghcr.io
@@ -298,7 +298,7 @@ jobs:
 
       - name: Set up Docker Buildx
         if: "inputs.image != '' && !cancelled()"
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:
           # Our generated Dockerfiles have many parallel FROM stages that
           # share large common base layers (e.g. CUDA flavors). Fetching the
