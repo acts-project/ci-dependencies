@@ -39,9 +39,11 @@ rocthrust@7.2.3  # no-auto-update: exact hip@ pin, capped by spack_repo/acts/pac
 # This is the one spec in the flavor that needs a Fortran compiler: builtin
 # rocrand carries an unconditional `depends_on("fortran", type="build")` from
 # Spack's generated language dependencies. It is build-only and satisfied by
-# the base image's gfortran (the ubuntu2604 image ships gfortran-15 alongside
-# gcc@15.2.0), so it resolves to the same external gcc rather than building one
-# — but it does mean this flavor now requires an image with Fortran.
+# the base image's gfortran (both images this flavor is built in —
+# ubuntu2604 and ubuntu2604_clang22 — ship gfortran-15), so it resolves to
+# an external gcc rather than building one, on the clang host too, since
+# spack_build.sh leaves the Fortran virtual unconstrained. But it does mean
+# this flavor requires an image with Fortran.
 #
 rocrand@7.2.3  # no-auto-update: exact hip@ pin, capped by spack_repo/acts/packages/hip/package.py's rpm table
 
