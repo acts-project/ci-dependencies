@@ -6,7 +6,7 @@
 # conflicts with %cuda@:12.9, and glibc 2.42+ needs cuda@13.1: (C23 exception
 # specs of cospi/sinpi/rsqrt changed in glibc 2.41). Re-check both if the base
 # image or compiler changes.
-cuda@13.3.0
+cuda@13.4.1
 
 # cuDNN for ONNX Runtime's CUDA execution provider (linked, not bundled). The
 # `-13` suffix ties depends_on to cuda@13, unifying with the toolkit above.
