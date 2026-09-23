@@ -38,11 +38,11 @@ jobs:
       os: ${{ matrix.os }}
       xcode: ${{ matrix.xcode }}
       compiler: ${{ matrix.compiler }}
-      cxxstd: "20"
+      cxxstd: "23"
       default: ${{ matrix.default }}
 
   build_container:
-    name: ${{ matrix.label }} · ${{ matrix.compiler }}${{ matrix.cxxstd == '23' && ' (C++23)' || '' }}
+    name: ${{ matrix.label }} · ${{ matrix.compiler }}${{ matrix.cxxstd == '20' && ' (C++20)' || '' }}
     permissions:
       contents: write
       packages: write
@@ -58,15 +58,13 @@ jobs:
             os: ubuntu-latest
             default: true
 
-          # C++23, which this job requires. Together with the ubuntu26.04/gcc
-          # entry below it is where the standard stays exercised, without every
-          # build depending on it. default: false so it never overwrites the
-          # canonical arch lockfile.
+          # This job requires C++23, which is now the default for every build,
+          # so it no longer needs to spell cxxstd out. default: false so it
+          # never overwrites the canonical arch lockfile.
           - image: ghcr.io/acts-project/ubuntu2604_clang22:89
             label: ubuntu26.04-clang22
             compiler: llvm@22.1.8
             os: ubuntu-latest
-            cxxstd: "23"
             default: false
 
           - image: ghcr.io/acts-project/alma10-base:89
@@ -88,16 +86,16 @@ jobs:
             os: ubuntu-24.04-arm
             default: false
 
-          # C++23 on gcc as well, so the standard is covered on both compilers
-          # rather than only where clang forces it. Same image, compiler and
-          # arch as the default ubuntu26.04 build above, so cxxstd is the only
-          # variable between the two. default: false, as for every non-canonical
-          # build.
+          # The only C++20 build left, kept so regressions against the older
+          # standard still surface while consumers finish moving to C++23. Same
+          # image, compiler and arch as the default ubuntu26.04 build above, so
+          # cxxstd is the only variable between the two. default: false, as for
+          # every non-canonical build.
           - image: ghcr.io/acts-project/ubuntu2604:89
             label: ubuntu26.04
             compiler: gcc@15.2.0
             os: ubuntu-latest
-            cxxstd: "23"
+            cxxstd: "20"
             default: false
 
           # GPU flavors overlay flavors/<flavor>.{yaml,specs} onto the base env;
@@ -117,7 +115,7 @@ jobs:
             flavor: rocm7
             default: false
 
-          # The same rocm7 flavor hosted on clang, at C++20. alpaka's HIP
+          # The same rocm7 flavor hosted on clang, at C++23. alpaka's HIP
           # backend needs the *host* compiler to be clang as well, not just the
           # device compiler: compiling traccc's device/alpaka at -O3 against the
           # gcc@15.2.0 rocm7 lockfile takes the clang frontend down
@@ -151,7 +149,7 @@ jobs:
       image: ${{ matrix.image }}
       compiler: ${{ matrix.compiler }}
       compiler_path: ${{ matrix.compiler_path || '' }}
-      cxxstd: ${{ matrix.cxxstd || '20' }}
+      cxxstd: ${{ matrix.cxxstd || '23' }}
       flavor: ${{ matrix.flavor || 'host' }}
       default: ${{ matrix.default }}
 
