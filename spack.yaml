@@ -1,7 +1,7 @@
 spack:
   specs:
     - boost@1.90.0 +program_options +test +json +graph +filesystem +process
-    - cmake@4.4.3
+    - cmake@4.4.4
     - ccache@4.12
     - edm4hep@1.1
     - eigen@5.0.1
@@ -37,7 +37,7 @@ spack:
     - mille@1.1.1 +root
     - generalbrokenlines@4.0.5 +root
 
-    - googletest@1.17.0
+    - googletest@1.18.0
       # perf counters only supported on linux
     - benchmark@1.9.5
     - arrow@24.0.0 +bz2 +parquet +zlib +zstd +dataset +filesystem +compute +snappy +brotli +python
@@ -56,7 +56,7 @@ spack:
     # accelerator variant on these same root specs (see flavors/*.specs), so the
     # versions live here only.
     - vecmem@1.27.0
-    - covfie@0.15.6
+    - covfie@0.16.0
 
     # Alpaka, traccc's portability backend, serial (CPU) backend only. Pinned to
     # what traccc/extern/alpaka fetches, so a TRACCC_USE_SYSTEM_ALPAKA build gets
