@@ -33,10 +33,10 @@ console = Console()
 REPO_ROOT = Path(__file__).parent
 WORKFLOW_FILE = REPO_ROOT / ".github/workflows/build.yml"
 
-# Mirrors the `cxxstd: ${{ matrix.cxxstd || '20' }}` default in build.yml: most
-# matrix entries leave cxxstd unset, and only the single C++23 build spells it
+# Mirrors the `cxxstd: ${{ matrix.cxxstd || '23' }}` default in build.yml: most
+# matrix entries leave cxxstd unset, and only the single C++20 build spells it
 # out. Keep in sync with build.yml and build_one.yml's input default.
-DEFAULT_CXXSTD = "20"
+DEFAULT_CXXSTD = "23"
 
 # CI sets up spack via `spack/setup-spack@v2`, which defaults to the `develop`
 # branch, then applies any spack_patches/*.patch (see build_one.yml). These
@@ -130,7 +130,7 @@ def load_macos_matrix() -> list[dict]:
     for e in entries:
         e = dict(e)
         e.setdefault("label", e.get("os", "macos"))
-        # build_macos's `with:` block hardcodes cxxstd: "20" for every entry;
+        # build_macos's `with:` block hardcodes cxxstd: "23" for every entry;
         # matrix.include itself never sets it.
         e.setdefault("cxxstd", DEFAULT_CXXSTD)
         out.append(e)
