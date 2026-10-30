@@ -3,15 +3,15 @@ spack:
     - boost@1.90.0 +program_options +test +json +graph +filesystem +process
     - cmake@4.4.4
     - ccache@4.12
-    - edm4hep@1.1
+    - edm4hep@1.2
     - eigen@5.0.1
-    - intel-tbb@2023.1.0
+    - intel-tbb@2023.2.0
     - nlohmann-json@3.12.0
-    - podio@1.8
+    - podio@1.9
     - root@6.40.04 -aqua -opengl -cxxmodules
     - dd4hep@1.38 +xercesc +edm4hep +hepmc3
-    - geomodel@6.31.0 +geomodelg4
-    - python@3.14
+    - geomodel@6.32.0 +geomodelg4
+    - python@3.15.1
     - py-pybind11 @3.1.0
     - py-pip
     - py-jinja2 # for edm4hep + podio
@@ -29,17 +29,17 @@ spack:
 
     - pythia8@8.317 -hepmc +hepmc3
     - geant4@11.4.3 -data
-    - fastjet@3.5.1 plugins=cxx
+    - fastjet@3.5.3 plugins=cxx
 
     - onnxruntime-bin@1.24.4
 
-    - millepede@5.1.6 +root
+    - millepede@5.1.7 +root
     - mille@1.1.2 +root
     - generalbrokenlines@4.0.6 +root
 
     - googletest@1.18.0
       # perf counters only supported on linux
-    - benchmark@1.9.5
+    - benchmark@1.10.0
     - arrow@24.0.0 +bz2 +parquet +zlib +zstd +dataset +filesystem +compute +snappy +brotli +python
 
     - actsvg@0.4.57
@@ -55,13 +55,13 @@ spack:
     # These are the plain CPU builds. The cuda13 / rocm7 flavors flip the
     # accelerator variant on these same root specs (see flavors/*.specs), so the
     # versions live here only.
-    - vecmem@1.28.0
+    - vecmem@1.30.0
     - covfie@0.16.0
 
     # Alpaka, traccc's portability backend, serial (CPU) backend only. Pinned to
     # what traccc/extern/alpaka fetches, so a TRACCC_USE_SYSTEM_ALPAKA build gets
     # the version traccc is tested against rather than the newest spack has.
-    - alpaka@2.1.1 backend=serial
+    - alpaka@2.2.0 backend=serial
   packages:
     all:
       target:
