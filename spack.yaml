@@ -11,7 +11,7 @@ spack:
     - root@6.40.04 -aqua -opengl -cxxmodules
     - dd4hep@1.38 +xercesc +edm4hep +hepmc3
     - geomodel@6.31.0 +geomodelg4
-    - python@3.14
+    - python@3.14 # no-auto-update: py-cython and py-scikit-build-core require Python <=3.14
     - py-pybind11 @3.1.0
     - py-pip
     - py-jinja2 # for edm4hep + podio

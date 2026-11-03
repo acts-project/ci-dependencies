@@ -63,8 +63,8 @@ def extract_name_version(spec: str) -> tuple[str, str | None] | None:
 
 def parse_spack_yaml(yaml_path: Path) -> tuple[dict[str, str | None], set[str]]:
     """Return ({package_name: current_version_or_None}, no_auto_update_names)."""
-    with open(yaml_path) as f:
-        data = yaml.safe_load(f)
+    source = yaml_path.read_text()
+    data = yaml.safe_load(source)
 
     packages: dict[str, str | None] = {}
     no_auto_update: set[str] = set()
@@ -74,6 +74,15 @@ def parse_spack_yaml(yaml_path: Path) -> tuple[dict[str, str | None], set[str]]:
             packages[parsed[0]] = parsed[1]
             if NO_AUTO_UPDATE_MARKER in spec:
                 no_auto_update.add(parsed[0])
+    # YAML parsing discards comments, so recover markers from root spec lines.
+    for raw_line in source.splitlines():
+        code, separator, comment = raw_line.partition("#")
+        if separator and NO_AUTO_UPDATE_MARKER in comment:
+            stripped = code.strip()
+            if stripped.startswith("- "):
+                parsed = extract_name_version(stripped[2:])
+                if parsed and parsed[0] in packages:
+                    no_auto_update.add(parsed[0])
     return packages, no_auto_update
 
 
