@@ -5,7 +5,7 @@ spack:
     - ccache@4.12
     - edm4hep@1.2
     - eigen@5.0.1
-    - intel-tbb@2023.2.0
+    - intel-tbb@2023.1.0
     - nlohmann-json@3.12.0
     - podio@1.9
     - root@6.40.04 -aqua -opengl -cxxmodules
