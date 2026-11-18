@@ -1,11 +1,11 @@
 spack:
   specs:
     - boost@1.90.0 +program_options +test +json +graph +filesystem +process
-    - cmake@4.4.4
+    - cmake@4.5.0
     - ccache@4.12
-    - edm4hep@1.2
+    - edm4hep@1.3
     - eigen@5.0.1
-    - intel-tbb@2023.1.0
+    - intel-tbb@2023.2.0
     - nlohmann-json@3.12.0
     - podio@1.9
     - root@6.40.04 -aqua -opengl -cxxmodules
@@ -33,8 +33,8 @@ spack:
 
     - onnxruntime-bin@1.24.4
 
-    - millepede@5.1.7 +root
-    - mille@1.1.2 +root
+    - millepede@5.1.8 +root
+    - mille@1.1.4 +root
     - generalbrokenlines@4.0.6 +root
 
     - googletest@1.18.0
@@ -55,7 +55,7 @@ spack:
     # These are the plain CPU builds. The cuda13 / rocm7 flavors flip the
     # accelerator variant on these same root specs (see flavors/*.specs), so the
     # versions live here only.
-    - vecmem@1.30.0
+    - vecmem@1.31.0
     - covfie@0.16.0
 
     # Alpaka, traccc's portability backend, serial (CPU) backend only. Pinned to
