@@ -402,3 +402,28 @@ jobs:
             echo "Dry-running the merge for the latest release: $tag"
             uv run merge_images.py "$tag" "$PATTERN" --no-push
           fi
+
+  lint:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/lint.yml
+    permissions:
+      contents: read
+
+  bump_versions:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/bump_versions.yml
+    permissions:
+      contents: write
+      pull-requests: write
+
+  gate:
+    name: gate
+    if: always() && github.event_name == 'pull_request'
+    needs: [build_macos, build_container, lockfile_diff, lint, bump_versions]
+    runs-on: ubuntu-slim
+    steps:
+      - name: Require every PR job to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          jq -e 'map_values(.result) | ., all(.[]; . == "success")' <<< "$RESULTS"
